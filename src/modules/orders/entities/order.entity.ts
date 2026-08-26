@@ -1,11 +1,23 @@
-export interface OrderItem {
-  productId: number;
-  quantity: number;
-}
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { OrderItem } from './order-item.entity';
 
+@Entity('orders')
 export class Order {
+  @PrimaryGeneratedColumn()
   id: number;
-  items: OrderItem[];
+
+  @Column('float')
   total: number;
+
+  @CreateDateColumn()
   createdAt: Date;
+
+  @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
+  items: OrderItem[];
 }

@@ -3,57 +3,68 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { Order, OrderItem } from './entities/order.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Order } from './entities/order.entity';
+import { OrderItem } from './entities/order-item.entity';
+import { Product } from '../products/entities/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class OrdersService {
-  private orders: Order[] = [];
-  private nextId = 1;
+  constructor(
+    @InjectRepository(Order)
+    private readonly ordersRepository: Repository<Order>,
+  ) {}
 
-  constructor(private readonly productsService: ProductsService) {}
-
-  findAll(): Order[] {
-    return this.orders;
+  findAll(): Promise<Order[]> {
+    return this.ordersRepository.find({ relations: { items: true } });
   }
 
-  findOne(id: number): Order {
-    const order = this.orders.find((o) => o.id === id);
+  async findOne(id: number): Promise<Order> {
+    const order = await this.ordersRepository.findOne({
+      where: { id },
+      relations: { items: true },
+    });
     if (!order) {
       throw new NotFoundException(`Pedido ${id} não encontrado`);
     }
     return order;
   }
 
-  create(dto: CreateOrderDto): Order {
-    let total = 0;
-    const items: OrderItem[] = [];
+  create(dto: CreateOrderDto): Promise<Order> {
+    return this.ordersRepository.manager.transaction(async (manager) => {
+      let total = 0;
+      const items: OrderItem[] = [];
 
-    for (const item of dto.items) {
-      const product = this.productsService.findOne(item.productId);
+      for (const item of dto.items) {
+        const product = await manager.findOneBy(Product, {
+          id: item.productId,
+        });
+        if (!product) {
+          throw new NotFoundException(
+            `Produto ${item.productId} não encontrado`,
+          );
+        }
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Estoque insuficiente para o produto ${product.name}`,
+          );
+        }
 
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Estoque insuficiente para o produto ${product.name}`,
-        );
+        total += product.price * item.quantity;
+
+        const orderItem = new OrderItem();
+        orderItem.productId = item.productId;
+        orderItem.quantity = item.quantity;
+        items.push(orderItem);
+
+        product.stock -= item.quantity;
+        await manager.save(product);
       }
 
-      total += product.price * item.quantity;
-      items.push({ productId: item.productId, quantity: item.quantity });
-
-      this.productsService.update(item.productId, {
-        stock: product.stock - item.quantity,
-      });
-    }
-
-    const order: Order = {
-      id: this.nextId++,
-      items,
-      total,
-      createdAt: new Date(),
-    };
-    this.orders.push(order);
-    return order;
+      const order = manager.create(Order, { total, items });
+      return manager.save(order);
+    });
   }
 }
