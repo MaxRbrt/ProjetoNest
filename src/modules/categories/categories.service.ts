@@ -1,38 +1,49 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { Product } from '../products/entities/product.entity';
 
 @Injectable()
 export class CategoriesService {
-  private categories: Category[] = [];
-  private nextId = 1;
+  constructor(
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
+  ) {}
 
-  findAll(): Category[] {
-    return this.categories;
+  findAll(): Promise<Category[]> {
+    return this.categoriesRepository.find();
   }
 
-  findOne(id: number): Category {
-    const category = this.categories.find((c) => c.id === id);
+  async findOne(id: number): Promise<Category> {
+    const category = await this.categoriesRepository.findOneBy({ id });
     if (!category) {
       throw new NotFoundException(`Categoria ${id} não encontrada`);
     }
     return category;
   }
 
-  create(dto: CreateCategoryDto): Category {
-    const category: Category = {
-      id: this.nextId++,
-      name: dto.name,
-    };
-    this.categories.push(category);
-    return category;
+  create(dto: CreateCategoryDto): Promise<Category> {
+    const category = this.categoriesRepository.create(dto);
+    return this.categoriesRepository.save(category);
   }
 
-  remove(id: number): void {
-    const index = this.categories.findIndex((c) => c.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`Categoria ${id} não encontrada`);
+  async remove(id: number): Promise<void> {
+    const category = await this.findOne(id);
+    const productsCount = await this.categoriesRepository.manager.countBy(
+      Product,
+      { categoryId: id },
+    );
+    if (productsCount > 0) {
+      throw new ConflictException(
+        `Não é possível remover a categoria ${id}: existem produtos vinculados a ela`,
+      );
     }
-    this.categories.splice(index, 1);
+    await this.categoriesRepository.remove(category);
   }
 }

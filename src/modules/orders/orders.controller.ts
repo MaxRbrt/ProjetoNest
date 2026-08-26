@@ -15,17 +15,17 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  findAll(): Order[] {
+  findAll(): Promise<Order[]> {
     return this.ordersService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Order {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<Order> {
     return this.ordersService.findOne(id);
   }
 
   @Post()
-  create(@Body() dto: CreateOrderDto): Order {
+  create(@Body() dto: CreateOrderDto): Promise<Order> {
     return this.ordersService.create(dto);
   }
 }

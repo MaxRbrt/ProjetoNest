@@ -2,11 +2,11 @@ import {
   Controller,
   Get,
   Post,
-  Delete,
   Body,
   Param,
   HttpCode,
   ParseIntPipe,
+  Delete,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
@@ -17,23 +17,23 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
-  findAll(): Category[] {
+  findAll(): Promise<Category[]> {
     return this.categoriesService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Category {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<Category> {
     return this.categoriesService.findOne(id);
   }
 
   @Post()
-  create(@Body() dto: CreateCategoryDto): Category {
+  create(@Body() dto: CreateCategoryDto): Promise<Category> {
     return this.categoriesService.create(dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.categoriesService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.categoriesService.remove(id);
   }
 }
