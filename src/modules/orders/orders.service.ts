@@ -37,9 +37,16 @@ export class OrdersService {
       let total = 0;
       const items: OrderItem[] = [];
 
-      for (const item of dto.items) {
-        const product = await manager.findOneBy(Product, {
-          id: item.productId,
+      // Ordenado por productId: duas transações concorrentes sempre pedem locks
+      // na mesma ordem, evitando deadlock quando um pedido tem múltiplos itens.
+      const sortedItems = [...dto.items].sort(
+        (a, b) => a.productId - b.productId,
+      );
+
+      for (const item of sortedItems) {
+        const product = await manager.findOne(Product, {
+          where: { id: item.productId },
+          lock: { mode: 'pessimistic_write' },
         });
         if (!product) {
           throw new NotFoundException(
