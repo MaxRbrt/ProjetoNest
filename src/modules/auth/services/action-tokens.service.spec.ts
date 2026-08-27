@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../usuarios/entities/user.entity';
 import {
   AuthActionToken,
   AuthActionTokenType,

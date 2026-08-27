@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { AuthEmailService } from '../email/email.service';
-import { User } from '../users/entities/user.entity';
+import { User } from '../usuarios/entities/user.entity';
 import {
   ACCOUNT_LOCK_MS,
   GENERIC_ACCEPTED_RESPONSE,

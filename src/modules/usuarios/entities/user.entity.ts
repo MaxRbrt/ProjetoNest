@@ -8,6 +8,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export enum Role {
+  ADMIN = 'ADMIN',
+  CLIENTE = 'CLIENTE',
+}
+
 @Entity('users')
 @Index('UQ_users_email', ['email'], { unique: true })
 @Check('CHK_users_failed_login_attempts', '"failedLoginAttempts" >= 0')
@@ -24,6 +29,15 @@ export class User {
 
   @Column({ type: 'text', select: false })
   passwordHash: string;
+
+  // ---------------------------------------------
+  // Papel de acesso
+  // ---------------------------------------------
+  // Nunca preenchido a partir de dados de request: RegisterDto não declara o
+  // campo e o ValidationPipe global rejeita propriedade não declarada.
+  // Promoção a ADMIN acontece apenas via script de seed.
+  @Column({ type: 'enum', enum: Role, default: Role.CLIENTE })
+  role: Role;
 
   // ---------------------------------------------
   // Verificação e bloqueio da conta

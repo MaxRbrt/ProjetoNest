@@ -2,7 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EntityManager, Repository } from 'typeorm';
 import { AuthEmailService } from '../email/email.service';
-import { User } from '../users/entities/user.entity';
+import { User } from '../usuarios/entities/user.entity';
 import { GENERIC_ACCEPTED_RESPONSE } from './auth.constants';
 import { AuthService } from './auth.service';
 import { ActionTokensService } from './services/action-tokens.service';

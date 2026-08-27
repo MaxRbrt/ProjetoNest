@@ -8,8 +8,8 @@ import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { CategoriesService } from '../categories/categories.service';
-import { OrderItem } from '../orders/entities/order-item.entity';
+import { CategoriesService } from '../categorias/categories.service';
+import { OrderItem } from '../pedidos/entities/order-item.entity';
 
 @Injectable()
 export class ProductsService {

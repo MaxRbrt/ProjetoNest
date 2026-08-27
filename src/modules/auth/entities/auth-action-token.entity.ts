@@ -8,7 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../usuarios/entities/user.entity';
 
 export enum AuthActionTokenType {
   EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
