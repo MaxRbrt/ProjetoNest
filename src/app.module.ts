@@ -5,12 +5,14 @@ import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CategoriesModule } from './modules/categories/categories.module';
-import { ProductsModule } from './modules/products/products.module';
-import { OrdersModule } from './modules/orders/orders.module';
+import { CategoriesModule } from './modules/categorias/categories.module';
+import { ProductsModule } from './modules/produtos/products.module';
+import { OrdersModule } from './modules/pedidos/orders.module';
 import { dataSourceOptions } from './db/data-source';
 import { validateEnvironment } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
   imports: [
@@ -37,6 +39,22 @@ import { AuthModule } from './modules/auth/auth.module';
   controllers: [AppController],
   providers: [
     AppService,
+    // ---------------------------------------------
+    // Guards globais
+    // ---------------------------------------------
+    // A ordem importa: autenticação roda antes do throttling, então uma
+    // requisição sem token nunca chega a consumir cota de rate limit.
+    // Toda rota nasce protegida; @Public() é a única exceção explícita.
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // RolesGuard depende de request.user já preenchido pelo JwtAuthGuard acima,
+    // por isso precisa ser registrado logo em seguida, antes do throttling.
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
     // O guard global define o limite padrão; rotas sensíveis podem sobrescrever
     // esse valor com políticas mais restritivas.
     {

@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { Role, User } from './entities/user.entity';
 
 export interface PublicUser {
   id: string;
   email: string;
   isEmailVerified: boolean;
   createdAt: Date;
+  role: Role;
 }
 
 @Injectable()
@@ -46,6 +47,7 @@ export class UsersService {
       email: user.email,
       isEmailVerified: user.emailVerifiedAt !== null,
       createdAt: user.createdAt,
+      role: user.role,
     };
   }
 }

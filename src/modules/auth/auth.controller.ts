@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { hours, minutes, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import type { PublicUser } from '../users/users.service';
+import { Public } from '../../decorators/public.decorator';
+import type { PublicUser } from '../usuarios/users.service';
 import { REFRESH_COOKIE_NAME } from './auth.constants';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -21,7 +22,6 @@ import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OriginGuard } from './guards/origin.guard';
 import { NoStoreInterceptor } from './interceptors/no-store.interceptor';
 import { RefreshCookieService } from './services/refresh-cookie.service';
@@ -49,6 +49,7 @@ export class AuthController {
   // ---------------------------------------------
   // Cadastro de usuário
   // ---------------------------------------------
+  @Public()
   @Post('register')
   @HttpCode(202)
   @Throttle({ default: { limit: 5, ttl: minutes(15) } })
@@ -59,6 +60,7 @@ export class AuthController {
   // ---------------------------------------------
   // Verificação de email
   // ---------------------------------------------
+  @Public()
   @Post('verify-email')
   @HttpCode(204)
   verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
@@ -68,6 +70,7 @@ export class AuthController {
   // ---------------------------------------------
   // Reenvio de verificação de email
   // ---------------------------------------------
+  @Public()
   @Post('resend-verification')
   @HttpCode(202)
   @Throttle({ default: { limit: 3, ttl: hours(1) } })
@@ -78,6 +81,7 @@ export class AuthController {
   // ---------------------------------------------
   // Login e emissão de sessão
   // ---------------------------------------------
+  @Public()
   @Post('login')
   @HttpCode(200)
   @UseGuards(OriginGuard)
@@ -94,6 +98,7 @@ export class AuthController {
   // ---------------------------------------------
   // Rotação de refresh token
   // ---------------------------------------------
+  @Public()
   @Post('refresh')
   @HttpCode(200)
   @UseGuards(OriginGuard)
@@ -121,6 +126,7 @@ export class AuthController {
   // ---------------------------------------------
   // Encerramento de sessão
   // ---------------------------------------------
+  @Public()
   @Post('logout')
   @HttpCode(204)
   @UseGuards(OriginGuard)
@@ -136,7 +142,6 @@ export class AuthController {
   // Consulta do usuário autenticado
   // ---------------------------------------------
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest): PublicUser {
     return request.user;
   }
@@ -144,6 +149,7 @@ export class AuthController {
   // ---------------------------------------------
   // Recuperação de senha
   // ---------------------------------------------
+  @Public()
   @Post('forgot-password')
   @HttpCode(202)
   @Throttle({ default: { limit: 3, ttl: hours(1) } })
@@ -151,6 +157,7 @@ export class AuthController {
     return this.auth.forgotPassword(dto);
   }
 
+  @Public()
   @Post('reset-password')
   @HttpCode(204)
   @Throttle({ default: { limit: 10, ttl: minutes(1) } })

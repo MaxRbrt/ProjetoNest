@@ -1,8 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, IsNull, MoreThan, Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { PublicUser, UsersService } from '../../users/users.service';
+import { User } from '../../usuarios/entities/user.entity';
+import { PublicUser, UsersService } from '../../usuarios/users.service';
 import { ACCESS_TOKEN_TTL_SECONDS, SESSION_TTL_MS } from '../auth.constants';
 import { AuthSession } from '../entities/auth-session.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';

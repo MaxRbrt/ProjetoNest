@@ -1,0 +1,14 @@
+[33m5798ed9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeat/autorizacao-ownership[m[33m)[m docs: spec de autorização e ownership (subprojeto 4)
+[33m3b7a778[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Organização docs
+[33m8f8258f[m Merge pull request #4 from MaxRbrt/feat/autenticacao-jwt
+[33mb4a9f84[m Merge pull request #3 from MaxRbrt/feat/autenticacao-jwt
+[33m49675ce[m docs: adiciona comentários em PT-BR organizados por bloco funcional
+[33m3f594fc[m fix(auth)
+[33m123d95d[m Merge pull request #2 from MaxRbrt/feat/persistencia-typeorm-supabase
+[33m7856d4a[m fix: enable RLS on Supabase tables, lock stock decrement against race condition
+[33m5e21abd[m Merge pull request #1 from MaxRbrt/feat/persistencia-typeorm-supabase
+[33m0e26c1d[m Realizado Segunda etapa de modificações
+[33mfcbe6f8[m docs: design shared Serena memory for Claude and Codex
+[33m1101c3a[m chore: remove .serena from version control
+[33m06be8c4[m Correção git
+[33m52aea86[m first commit
