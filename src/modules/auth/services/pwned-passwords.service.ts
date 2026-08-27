@@ -27,7 +27,7 @@ export class PwnedPasswordsService {
     const expectedSuffix = sha1.slice(5);
 
     try {
-      // O modelo k-anonymity envia somente o prefixo do hash; a senha e o hash
+      // O modelo de k-anonimato envia somente o prefixo do hash; a senha e o hash
       // completo nunca saem da aplicação.
       const response = await fetch(`${this.apiUrl}/range/${prefix}`, {
         headers: {

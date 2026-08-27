@@ -23,6 +23,9 @@ describe('PwnedPasswordsService', () => {
     fetchMock.mockRestore();
   });
 
+  // ---------------------------------------------
+  // Consulta por prefixo e interpretação da resposta
+  // ---------------------------------------------
   it('envia só o prefixo SHA-1 e identifica senha comprometida', async () => {
     fetchMock.mockResolvedValue(
       new Response('1E4C9B93F3F0682250B6CF8331B7EE68FD8:3303003\nABC:0', {
@@ -53,6 +56,9 @@ describe('PwnedPasswordsService', () => {
     await expect(service.isCompromised('password')).resolves.toBe(false);
   });
 
+  // ---------------------------------------------
+  // Falha segura da integração externa
+  // ---------------------------------------------
   it('falha fechada quando a API responde com erro', async () => {
     fetchMock.mockResolvedValue(new Response('', { status: 503 }));
 

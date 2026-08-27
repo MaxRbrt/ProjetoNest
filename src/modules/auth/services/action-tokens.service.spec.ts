@@ -74,7 +74,7 @@ describe('ActionTokensService', () => {
     expect(saved).not.toHaveProperty('rawToken');
   });
 
-  it('respeita cooldown de cinco minutos para verificação', async () => {
+  it('respeita intervalo mínimo de cinco minutos para verificação', async () => {
     manager.findOne.mockResolvedValue(
       Object.assign(new AuthActionToken(), {
         createdAt: new Date('2026-08-26T11:58:00.000Z'),
@@ -119,7 +119,7 @@ describe('ActionTokensService', () => {
     expect(user.emailVerifiedAt).toEqual(new Date('2026-08-26T12:00:00.000Z'));
   });
 
-  it('trava usuário antes do action token e revalida após ambos os locks', async () => {
+  it('trava usuário antes do token de ação e revalida após ambos os bloqueios', async () => {
     const opaque = opaqueTokens.generate();
     const action = Object.assign(new AuthActionToken(), {
       id: '4a76e6ec-61c1-497e-931a-e1e8f9c15331',

@@ -13,7 +13,13 @@ import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { Roles } from '../../decorators/roles.decorator';
+import { Role } from '../usuarios/entities/user.entity';
 
+// ---------------------------------------------
+// Catálogo de produtos
+// ---------------------------------------------
+// Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -37,6 +43,7 @@ export class ProductsController {
   // ---------------------------------------------
   // Criação de produto
   // ---------------------------------------------
+  @Roles(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateProductDto): Promise<Product> {
     return this.productsService.create(dto);
@@ -45,6 +52,7 @@ export class ProductsController {
   // ---------------------------------------------
   // Atualização de produto
   // ---------------------------------------------
+  @Roles(Role.ADMIN)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -56,6 +64,7 @@ export class ProductsController {
   // ---------------------------------------------
   // Remoção de produto
   // ---------------------------------------------
+  @Roles(Role.ADMIN)
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {

@@ -9,6 +9,11 @@ import { Observable } from 'rxjs';
 
 @Injectable()
 export class NoStoreInterceptor implements NestInterceptor {
+  // ---------------------------------------------
+  // Prevenção de cache nas respostas de autenticação
+  // ---------------------------------------------
+  // Respostas de autenticação podem conter credenciais ou dados sensíveis;
+  // no-store impede que navegadores e intermediários as armazenem.
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     context
       .switchToHttp()

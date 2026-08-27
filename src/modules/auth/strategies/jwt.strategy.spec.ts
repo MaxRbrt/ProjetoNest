@@ -23,7 +23,10 @@ describe('JwtStrategy', () => {
   } as unknown as ConfigService;
   const strategy = new JwtStrategy(config, sessions);
 
-  it('confirma usuário e sessão ativos a cada request protegido', async () => {
+  // ---------------------------------------------
+  // Cenários de validação do JWT
+  // ---------------------------------------------
+  it('confirma usuário e sessão ativos a cada requisição protegida', async () => {
     await expect(
       strategy.validate({
         sub: user.id,
@@ -40,7 +43,7 @@ describe('JwtStrategy', () => {
     {},
     { sub: 'não-uuid', sid: '4a76e6ec-61c1-497e-931a-e1e8f9c15331' },
     { sub: user.id, sid: 'não-uuid' },
-  ])('rejeita claims de identidade malformados', (payload) => {
+  ])('rejeita dados de identidade malformados', (payload) => {
     expect(() => strategy.validate(payload)).toThrow(UnauthorizedException);
   });
 });

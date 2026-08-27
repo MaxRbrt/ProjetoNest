@@ -5,6 +5,9 @@ import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { CategoriesModule } from '../categorias/categories.module';
 
+// ---------------------------------------------
+// Composição do módulo de produtos
+// ---------------------------------------------
 @Module({
   imports: [TypeOrmModule.forFeature([Product]), CategoriesModule],
   controllers: [ProductsController],

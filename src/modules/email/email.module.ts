@@ -4,6 +4,9 @@ import { AuthEmailService } from './email.service';
 import { RESEND_CLIENT, createResendClient } from './resend-client';
 import { ResendEmailService } from './resend-email.service';
 
+// ---------------------------------------------
+// Composição do módulo de email
+// ---------------------------------------------
 @Module({
   providers: [
     {

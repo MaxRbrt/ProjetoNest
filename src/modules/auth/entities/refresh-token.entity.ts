@@ -13,6 +13,9 @@ import { AuthSession } from './auth-session.entity';
 @Index('UQ_refresh_tokens_token_hash', ['tokenHash'], { unique: true })
 @Index('IDX_refresh_tokens_session_id', ['sessionId'])
 export class RefreshToken {
+  // ---------------------------------------------
+  // Identidade e vínculo com a sessão
+  // ---------------------------------------------
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -23,12 +26,18 @@ export class RefreshToken {
   @JoinColumn({ name: 'sessionId' })
   session: AuthSession;
 
+  // ---------------------------------------------
+  // Segredo persistido e validade
+  // ---------------------------------------------
   @Column({ type: 'char', length: 64, select: false })
   tokenHash: string;
 
   @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
+  // ---------------------------------------------
+  // Consumo, revogação e cadeia de rotação
+  // ---------------------------------------------
   @Column({ type: 'timestamptz', nullable: true })
   usedAt: Date | null;
 

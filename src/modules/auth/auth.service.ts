@@ -64,7 +64,7 @@ export class AuthService {
     now = new Date(),
   ): Promise<typeof GENERIC_ACCEPTED_RESPONSE> {
     const startedAt = Date.now();
-    // O Argon2 roda antes da transação para não manter locks durante uma
+    // O Argon2 roda antes da transação para não manter bloqueios durante uma
     // operação deliberadamente cara de CPU e memória.
     const passwordHash = await this.passwords.hash(dto.password);
     let job: EmailJob | null;
@@ -120,7 +120,7 @@ export class AuthService {
     const startedAt = Date.now();
     const result = await this.usersRepository.manager.transaction(
       async (manager): Promise<LoginResult> => {
-        // O lock serializa tentativas concorrentes para que a contagem de
+        // O bloqueio serializa tentativas concorrentes para que a contagem de
         // falhas e o bloqueio temporário não percam atualizações.
         const user = await manager.findOne(User, {
           where: { email: dto.email },

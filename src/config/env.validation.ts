@@ -135,7 +135,7 @@ export function validateEnvironment(input: Environment): Environment {
     throw new Error(`Configuração inválida: ${errors.join('; ')}`);
   }
 
-  // Os defaults validados voltam no mesmo objeto consumido pelo ConfigModule.
+  // Os valores padrão validados voltam no mesmo objeto consumido pelo ConfigModule.
   return {
     ...environment,
     NODE_ENV: nodeEnvironment,

@@ -11,7 +11,13 @@ import {
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { Roles } from '../../decorators/roles.decorator';
+import { Role } from '../usuarios/entities/user.entity';
 
+// ---------------------------------------------
+// Catálogo de categorias
+// ---------------------------------------------
+// Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
@@ -35,6 +41,7 @@ export class CategoriesController {
   // ---------------------------------------------
   // Criação de categoria
   // ---------------------------------------------
+  @Roles(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateCategoryDto): Promise<Category> {
     return this.categoriesService.create(dto);
@@ -43,6 +50,7 @@ export class CategoriesController {
   // ---------------------------------------------
   // Remoção de categoria
   // ---------------------------------------------
+  @Roles(Role.ADMIN)
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {

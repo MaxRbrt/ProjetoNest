@@ -12,7 +12,10 @@ const validEnvironment = {
 };
 
 describe('validateEnvironment', () => {
-  it('aceita uma configuração de desenvolvimento válida e aplica defaults', () => {
+  // ---------------------------------------------
+  // Configuração válida e valores padrão
+  // ---------------------------------------------
+  it('aceita uma configuração de desenvolvimento válida e aplica valores padrão', () => {
     expect(validateEnvironment(validEnvironment)).toEqual(
       expect.objectContaining({
         NODE_ENV: 'development',
@@ -23,6 +26,9 @@ describe('validateEnvironment', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Obrigatoriedade e robustez dos segredos
+  // ---------------------------------------------
   it('rejeita campos obrigatórios ausentes em uma única mensagem', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'development' })).toThrow(
       /DATABASE_URL.*JWT_SECRET.*JWT_ISSUER.*JWT_AUDIENCE.*RESEND_API_KEY.*EMAIL_FROM.*FRONTEND_URL/s,
@@ -45,7 +51,10 @@ describe('validateEnvironment', () => {
     ).toThrow(/JWT_SECRET.*RESEND_API_KEY/s);
   });
 
-  it('exige HTTPS para o frontend em produção', () => {
+  // ---------------------------------------------
+  // URLs e limites de segurança
+  // ---------------------------------------------
+  it('exige HTTPS para a aplicação cliente em produção', () => {
     expect(() =>
       validateEnvironment({ ...validEnvironment, NODE_ENV: 'production' }),
     ).toThrow('FRONTEND_URL deve usar HTTPS em produção');

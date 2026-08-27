@@ -9,6 +9,9 @@ function createService(nodeEnvironment: string): RefreshCookieService {
 }
 
 describe('RefreshCookieService', () => {
+  // ---------------------------------------------
+  // Definição segura do cookie
+  // ---------------------------------------------
   it('define cookie host-only, HttpOnly, Strict e Secure em produção', () => {
     const response = { cookie: jest.fn() } as unknown as Response;
     const now = new Date('2026-08-26T12:00:00.000Z');
@@ -49,6 +52,9 @@ describe('RefreshCookieService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Remoção com o mesmo escopo de criação
+  // ---------------------------------------------
   it('limpa com as mesmas opções de escopo', () => {
     const response = { clearCookie: jest.fn() } as unknown as Response;
 

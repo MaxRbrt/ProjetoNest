@@ -8,6 +8,9 @@ describe('JwtAuthGuard', () => {
     getClass: () => class {},
   } as unknown as ExecutionContext;
 
+  // ---------------------------------------------
+  // Comportamento de rotas públicas e protegidas
+  // ---------------------------------------------
   it('libera rota marcada como pública sem validar token', () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(true),

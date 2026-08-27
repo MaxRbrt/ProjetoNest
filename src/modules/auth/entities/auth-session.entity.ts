@@ -15,6 +15,9 @@ import { User } from '../../usuarios/entities/user.entity';
   where: '"revokedAt" IS NULL',
 })
 export class AuthSession {
+  // ---------------------------------------------
+  // Identidade e vínculo com o usuário
+  // ---------------------------------------------
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -25,12 +28,18 @@ export class AuthSession {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  // ---------------------------------------------
+  // Validade e revogação da sessão
+  // ---------------------------------------------
   @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true })
   revokedAt: Date | null;
 
+  // ---------------------------------------------
+  // Criação e atividade da sessão
+  // ---------------------------------------------
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

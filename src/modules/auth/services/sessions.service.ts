@@ -110,8 +110,8 @@ export class SessionsService {
           return { status: 'invalid' };
         }
 
-        // Locks seguem sempre usuário -> sessão -> refresh token. Uma ordem
-        // única reduz o risco de deadlock com logout e troca de senha.
+        // Os bloqueios seguem sempre usuário -> sessão -> refresh token. Uma
+        // ordem única reduz o risco de interbloqueio com logout e troca de senha.
         const user = await manager.findOne(User, {
           where: { id: sessionCandidate.userId },
           lock: { mode: 'pessimistic_write' },
@@ -213,7 +213,7 @@ export class SessionsService {
       }
 
       // No logout, a sessão é travada antes do refresh para preservar a mesma
-      // ordem usada na rotação e evitar deadlocks concorrentes.
+      // ordem usada na rotação e evitar interbloqueios concorrentes.
       const session = await manager.findOne(AuthSession, {
         where: { id: candidate.sessionId },
         lock: { mode: 'pessimistic_write' },

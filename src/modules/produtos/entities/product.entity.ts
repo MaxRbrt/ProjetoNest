@@ -11,6 +11,9 @@ import { OrderItem } from '../../pedidos/entities/order-item.entity';
 
 @Entity('products')
 export class Product {
+  // ---------------------------------------------
+  // Dados comerciais e estoque
+  // ---------------------------------------------
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -23,6 +26,9 @@ export class Product {
   @Column()
   stock: number;
 
+  // ---------------------------------------------
+  // Vínculo com a categoria
+  // ---------------------------------------------
   @Column()
   categoryId: number;
 
@@ -30,6 +36,9 @@ export class Product {
   @JoinColumn({ name: 'categoryId' })
   category: Category;
 
+  // ---------------------------------------------
+  // Dependência de itens de pedido
+  // ---------------------------------------------
   @OneToMany(() => OrderItem, (item) => item.product)
   orderItems: OrderItem[];
 }
