@@ -19,6 +19,9 @@ export class OriginGuard implements CanActivate {
     ).origin;
   }
 
+  // ---------------------------------------------
+  // Validação da origem em ambiente de produção
+  // ---------------------------------------------
   canActivate(context: ExecutionContext): boolean {
     if (!this.isProduction) {
       return true;

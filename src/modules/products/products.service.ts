@@ -19,10 +19,16 @@ export class ProductsService {
     private readonly categoriesService: CategoriesService,
   ) {}
 
+  // ---------------------------------------------
+  // Listagem de produtos
+  // ---------------------------------------------
   findAll(): Promise<Product[]> {
     return this.productsRepository.find();
   }
 
+  // ---------------------------------------------
+  // Consulta de produto por identificador
+  // ---------------------------------------------
   async findOne(id: number): Promise<Product> {
     const product = await this.productsRepository.findOneBy({ id });
     if (!product) {
@@ -31,12 +37,18 @@ export class ProductsService {
     return product;
   }
 
+  // ---------------------------------------------
+  // Criação de produto
+  // ---------------------------------------------
   async create(dto: CreateProductDto): Promise<Product> {
     await this.categoriesService.findOne(dto.categoryId);
     const product = this.productsRepository.create(dto);
     return this.productsRepository.save(product);
   }
 
+  // ---------------------------------------------
+  // Atualização de produto
+  // ---------------------------------------------
   async update(id: number, dto: UpdateProductDto): Promise<Product> {
     const product = await this.findOne(id);
     if (dto.categoryId !== undefined) {
@@ -46,12 +58,17 @@ export class ProductsService {
     return this.productsRepository.save(product);
   }
 
+  // ---------------------------------------------
+  // Remoção com checagem de pedidos
+  // ---------------------------------------------
   async remove(id: number): Promise<void> {
     const product = await this.findOne(id);
     const orderItemsCount = await this.productsRepository.manager.countBy(
       OrderItem,
       { productId: id },
     );
+    // A checagem explícita converte a dependência em um conflito de negócio
+    // compreensível antes de tentar violar a chave estrangeira.
     if (orderItemsCount > 0) {
       throw new ConflictException(
         `Não é possível remover o produto ${id}: existem pedidos vinculados a ele`,

@@ -14,6 +14,9 @@ import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
+    // ---------------------------------------------
+    // Configuração e infraestrutura globais
+    // ---------------------------------------------
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
@@ -23,6 +26,9 @@ import { AuthModule } from './modules/auth/auth.module';
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: minutes(1), limit: 100 }],
     }),
+    // ---------------------------------------------
+    // Módulos de domínio
+    // ---------------------------------------------
     CategoriesModule,
     ProductsModule,
     OrdersModule,
@@ -31,6 +37,8 @@ import { AuthModule } from './modules/auth/auth.module';
   controllers: [AppController],
   providers: [
     AppService,
+    // O guard global define o limite padrão; rotas sensíveis podem sobrescrever
+    // esse valor com políticas mais restritivas.
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

@@ -27,6 +27,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  // ---------------------------------------------
+  // Validação do token e da sessão ativa
+  // ---------------------------------------------
   validate(payload: AccessTokenPayload): Promise<PublicUser> {
     if (
       typeof payload?.sub !== 'string' ||

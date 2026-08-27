@@ -26,6 +26,9 @@ export class ResendEmailService extends AuthEmailService {
       .replace(/\/$/, '');
   }
 
+  // ---------------------------------------------
+  // Envio de verificação de email
+  // ---------------------------------------------
   sendEmailVerification(input: AuthEmailInput): Promise<void> {
     return this.send(
       input,
@@ -36,6 +39,9 @@ export class ResendEmailService extends AuthEmailService {
     );
   }
 
+  // ---------------------------------------------
+  // Envio de recuperação de senha
+  // ---------------------------------------------
   sendPasswordReset(input: AuthEmailInput): Promise<void> {
     return this.send(
       input,
@@ -46,6 +52,9 @@ export class ResendEmailService extends AuthEmailService {
     );
   }
 
+  // ---------------------------------------------
+  // Montagem e envio idempotente
+  // ---------------------------------------------
   private async send(
     input: AuthEmailInput,
     subject: string,
@@ -53,6 +62,8 @@ export class ResendEmailService extends AuthEmailService {
     idempotencyPrefix: string,
     linkText: string,
   ): Promise<void> {
+    // O fragmento fica no navegador e não é enviado pelo HTTP ao servidor que
+    // entrega a página, reduzindo a exposição do token em logs de acesso.
     const url = `${this.frontendUrl}/${path}#token=${encodeURIComponent(input.rawToken)}`;
 
     try {
@@ -64,6 +75,8 @@ export class ResendEmailService extends AuthEmailService {
           html: `<p><a href="${url}">${linkText}</a></p>`,
         },
         {
+          // Repetir a mesma ação após uma falha transitória não deve gerar
+          // múltiplos emails para o usuário.
           idempotencyKey: `${idempotencyPrefix}/${input.actionTokenId}`,
         },
       );

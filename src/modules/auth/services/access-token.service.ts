@@ -18,6 +18,9 @@ export class AccessTokenService {
     this.audience = config.getOrThrow<string>('JWT_AUDIENCE');
   }
 
+  // ---------------------------------------------
+  // Emissão de access token
+  // ---------------------------------------------
   issue(userId: string, sessionId: string): Promise<string> {
     return this.jwt.signAsync(
       { sid: sessionId },

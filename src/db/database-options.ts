@@ -1,5 +1,8 @@
 import { DataSourceOptions } from 'typeorm';
 
+// ---------------------------------------------
+// Configuração da conexão com PostgreSQL
+// ---------------------------------------------
 export function createDataSourceOptions(
   environment: NodeJS.ProcessEnv,
 ): DataSourceOptions {
@@ -10,6 +13,8 @@ export function createDataSourceOptions(
 
   let url = databaseUrl;
   if (environment.NODE_ENV === 'test') {
+    // Testes nunca podem herdar silenciosamente o banco principal; a URL
+    // separada evita destruição ou contaminação acidental de dados reais.
     const testDatabaseUrl = environment.TEST_DATABASE_URL;
     if (!testDatabaseUrl) {
       throw new Error('TEST_DATABASE_URL é obrigatória em ambiente de teste');
@@ -22,6 +27,8 @@ export function createDataSourceOptions(
     url = testDatabaseUrl;
   }
 
+  // synchronize permanece desligado para que somente migrations versionadas
+  // alterem o schema.
   return {
     type: 'postgres',
     url,

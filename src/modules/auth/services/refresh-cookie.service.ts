@@ -11,6 +11,9 @@ export class RefreshCookieService {
     this.secure = config.getOrThrow<string>('NODE_ENV') !== 'development';
   }
 
+  // ---------------------------------------------
+  // Gravação do refresh token em cookie
+  // ---------------------------------------------
   set(
     response: Response,
     rawToken: string,
@@ -23,10 +26,16 @@ export class RefreshCookieService {
     });
   }
 
+  // ---------------------------------------------
+  // Remoção do cookie de sessão
+  // ---------------------------------------------
   clear(response: Response): void {
     response.clearCookie(REFRESH_COOKIE_NAME, this.options());
   }
 
+  // ---------------------------------------------
+  // Escopo e proteções do cookie
+  // ---------------------------------------------
   private options(): CookieOptions {
     return {
       httpOnly: true,

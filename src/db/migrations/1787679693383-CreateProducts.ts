@@ -3,6 +3,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class CreateProducts1787679693383 implements MigrationInterface {
   name = 'CreateProducts1787679693383';
 
+  // ---------------------------------------------
+  // Criação de produtos e vínculo com categorias
+  // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `CREATE TABLE "products" ("id" SERIAL NOT NULL, "name" character varying NOT NULL, "price" double precision NOT NULL, "stock" integer NOT NULL, "categoryId" integer NOT NULL, CONSTRAINT "PK_0806c755e0aca124e67c0cf6d7d" PRIMARY KEY ("id"))`,
@@ -12,7 +15,11 @@ export class CreateProducts1787679693383 implements MigrationInterface {
     );
   }
 
+  // ---------------------------------------------
+  // Reversão de produtos e dependências
+  // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // A chave estrangeira precisa sair antes da tabela que ela protege.
     await queryRunner.query(
       `ALTER TABLE "products" DROP CONSTRAINT "FK_ff56834e735fa78a15d0cf21926"`,
     );

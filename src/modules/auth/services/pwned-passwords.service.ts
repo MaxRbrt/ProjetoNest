@@ -15,6 +15,9 @@ export class PwnedPasswordsService {
     this.timeoutMs = config.getOrThrow<number>('HIBP_TIMEOUT_MS');
   }
 
+  // ---------------------------------------------
+  // Consulta de senha em vazamentos conhecidos
+  // ---------------------------------------------
   async isCompromised(password: string): Promise<boolean> {
     const sha1 = createHash('sha1')
       .update(password, 'utf8')
@@ -24,6 +27,8 @@ export class PwnedPasswordsService {
     const expectedSuffix = sha1.slice(5);
 
     try {
+      // O modelo k-anonymity envia somente o prefixo do hash; a senha e o hash
+      // completo nunca saem da aplicação.
       const response = await fetch(`${this.apiUrl}/range/${prefix}`, {
         headers: {
           'Add-Padding': 'true',
@@ -42,6 +47,8 @@ export class PwnedPasswordsService {
         return suffix === expectedSuffix && Number(count) > 0;
       });
     } catch {
+      // Falha fechada: se a verificação externa não é confiável, o cadastro
+      // não prossegue com uma senha possivelmente comprometida.
       throw new ServiceUnavailableException(UNAVAILABLE_MESSAGE);
     }
   }

@@ -53,6 +53,9 @@ describe('ActionTokensService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Emissão de tokens de ação
+  // ---------------------------------------------
   it('emite verificação de 24 horas e persiste somente o hash', async () => {
     manager.findOne.mockResolvedValue(null);
     const now = new Date('2026-08-26T12:00:00.000Z');
@@ -88,6 +91,9 @@ describe('ActionTokensService', () => {
     expect(manager.save).not.toHaveBeenCalled();
   });
 
+  // ---------------------------------------------
+  // Consumo de verificação de email
+  // ---------------------------------------------
   it('consome verificação uma vez e marca o usuário', async () => {
     const opaque = opaqueTokens.generate();
     const action = Object.assign(new AuthActionToken(), {
@@ -165,6 +171,9 @@ describe('ActionTokensService', () => {
     expect(user.emailVerifiedAt).toBeNull();
   });
 
+  // ---------------------------------------------
+  // Redefinição de senha e revogação de sessões
+  // ---------------------------------------------
   it('reset troca o hash e revoga todas as sessões na mesma transação', async () => {
     const opaque = opaqueTokens.generate();
     const action = Object.assign(new AuthActionToken(), {

@@ -8,6 +8,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+// ---------------------------------------------
+// Validação dos itens do pedido
+// ---------------------------------------------
 export class CreateOrderItemDto {
   @IsInt()
   @IsPositive()
@@ -18,6 +21,9 @@ export class CreateOrderItemDto {
   quantity: number;
 }
 
+// ---------------------------------------------
+// Validação do pedido
+// ---------------------------------------------
 export class CreateOrderDto {
   @IsArray()
   @ArrayMinSize(1)

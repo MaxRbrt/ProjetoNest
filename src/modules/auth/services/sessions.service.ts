@@ -40,6 +40,9 @@ export class SessionsService {
     private readonly users: UsersService,
   ) {}
 
+  // ---------------------------------------------
+  // Criação de sessão
+  // ---------------------------------------------
   async create(user: User, now = new Date()): Promise<AuthenticatedSession> {
     const persisted = await this.sessionsRepository.manager.transaction(
       async (manager) => this.createWithManager(manager, user, now),
@@ -47,6 +50,9 @@ export class SessionsService {
     return this.complete(persisted);
   }
 
+  // ---------------------------------------------
+  // Persistência da sessão e do refresh token
+  // ---------------------------------------------
   async createWithManager(
     manager: EntityManager,
     user: User,
@@ -80,6 +86,9 @@ export class SessionsService {
     };
   }
 
+  // ---------------------------------------------
+  // Rotação de refresh token
+  // ---------------------------------------------
   async refresh(
     rawToken: string,
     now = new Date(),
@@ -101,6 +110,8 @@ export class SessionsService {
           return { status: 'invalid' };
         }
 
+        // Locks seguem sempre usuário -> sessão -> refresh token. Uma ordem
+        // única reduz o risco de deadlock com logout e troca de senha.
         const user = await manager.findOne(User, {
           where: { id: sessionCandidate.userId },
           lock: { mode: 'pessimistic_write' },
@@ -133,6 +144,8 @@ export class SessionsService {
         }
 
         if (current.usedAt || current.revokedAt) {
+          // Reutilização indica possível roubo do token; toda a família da
+          // sessão é revogada, não apenas o valor reapresentado.
           await this.revokeWithManager(manager, session, now);
           return { status: 'invalid' };
         }
@@ -182,6 +195,9 @@ export class SessionsService {
     return this.complete(result);
   }
 
+  // ---------------------------------------------
+  // Encerramento idempotente de sessão
+  // ---------------------------------------------
   async logout(rawToken: string | undefined, now = new Date()): Promise<void> {
     if (!rawToken) {
       return;
@@ -196,6 +212,8 @@ export class SessionsService {
         return;
       }
 
+      // No logout, a sessão é travada antes do refresh para preservar a mesma
+      // ordem usada na rotação e evitar deadlocks concorrentes.
       const session = await manager.findOne(AuthSession, {
         where: { id: candidate.sessionId },
         lock: { mode: 'pessimistic_write' },
@@ -220,6 +238,9 @@ export class SessionsService {
     });
   }
 
+  // ---------------------------------------------
+  // Validação de sessão protegida
+  // ---------------------------------------------
   async validateActiveSession(
     userId: string,
     sessionId: string,
@@ -245,6 +266,9 @@ export class SessionsService {
     return this.users.toPublicUser(user);
   }
 
+  // ---------------------------------------------
+  // Revogação de todas as sessões do usuário
+  // ---------------------------------------------
   revokeAllWithManager(
     manager: EntityManager,
     userId: string,
@@ -257,6 +281,9 @@ export class SessionsService {
     );
   }
 
+  // ---------------------------------------------
+  // Revogação interna de uma família de tokens
+  // ---------------------------------------------
   private async revokeWithManager(
     manager: EntityManager,
     session: AuthSession,
@@ -273,6 +300,9 @@ export class SessionsService {
     );
   }
 
+  // ---------------------------------------------
+  // Emissão do access token para a sessão persistida
+  // ---------------------------------------------
   async complete(persisted: PersistedSession): Promise<AuthenticatedSession> {
     const accessToken = await this.accessTokens.issue(
       persisted.user.id,

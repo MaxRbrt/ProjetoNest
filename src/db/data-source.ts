@@ -2,6 +2,9 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { createDataSourceOptions } from './database-options';
 
+// ---------------------------------------------
+// Data source compartilhado pela aplicação e CLI
+// ---------------------------------------------
 export const dataSourceOptions = createDataSourceOptions(process.env);
 
 const dataSource = new DataSource(dataSourceOptions);

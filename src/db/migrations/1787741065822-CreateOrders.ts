@@ -3,13 +3,25 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class CreateOrders1787741065822 implements MigrationInterface {
   name = 'CreateOrders1787741065822';
 
+  // ---------------------------------------------
+  // Criação de pedidos, itens e relacionamentos
+  // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // ---------------------------------------------
+    // Cabeçalho do pedido
+    // ---------------------------------------------
     await queryRunner.query(
       `CREATE TABLE "orders" ("id" SERIAL NOT NULL, "total" double precision NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_710e2d4957aa5878dfe94e4ac2f" PRIMARY KEY ("id"))`,
     );
+    // ---------------------------------------------
+    // Itens do pedido
+    // ---------------------------------------------
     await queryRunner.query(
       `CREATE TABLE "order_items" ("id" SERIAL NOT NULL, "quantity" integer NOT NULL, "orderId" integer NOT NULL, "productId" integer NOT NULL, CONSTRAINT "PK_005269d8574e6fac0493715c308" PRIMARY KEY ("id"))`,
     );
+    // ---------------------------------------------
+    // Integridade entre pedido, itens e produtos
+    // ---------------------------------------------
     await queryRunner.query(
       `ALTER TABLE "order_items" ADD CONSTRAINT "FK_f1d359a55923bb45b057fbdab0d" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
@@ -18,7 +30,12 @@ export class CreateOrders1787741065822 implements MigrationInterface {
     );
   }
 
+  // ---------------------------------------------
+  // Reversão de pedidos e itens
+  // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Dependências são removidas na ordem inversa da criação para liberar as
+    // tabelas referenciadas.
     await queryRunner.query(
       `ALTER TABLE "order_items" DROP CONSTRAINT "FK_cdb99c05982d5191ac8465ac010"`,
     );

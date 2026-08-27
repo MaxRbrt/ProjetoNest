@@ -17,10 +17,16 @@ export class OrdersService {
     private readonly ordersRepository: Repository<Order>,
   ) {}
 
+  // ---------------------------------------------
+  // Listagem de pedidos
+  // ---------------------------------------------
   findAll(): Promise<Order[]> {
     return this.ordersRepository.find({ relations: { items: true } });
   }
 
+  // ---------------------------------------------
+  // Consulta de pedido por identificador
+  // ---------------------------------------------
   async findOne(id: number): Promise<Order> {
     const order = await this.ordersRepository.findOne({
       where: { id },
@@ -32,7 +38,12 @@ export class OrdersService {
     return order;
   }
 
+  // ---------------------------------------------
+  // Criação de pedido com baixa de estoque
+  // ---------------------------------------------
   create(dto: CreateOrderDto): Promise<Order> {
+    // Pedido, itens e baixas de estoque formam uma única unidade: qualquer
+    // falha desfaz todas as alterações da transação.
     return this.ordersRepository.manager.transaction(async (manager) => {
       let total = 0;
       const items: OrderItem[] = [];
@@ -44,6 +55,8 @@ export class OrdersService {
       );
 
       for (const item of sortedItems) {
+        // O lock pessimista impede que dois pedidos aprovem simultaneamente o
+        // mesmo saldo antes de efetuar a baixa.
         const product = await manager.findOne(Product, {
           where: { id: item.productId },
           lock: { mode: 'pessimistic_write' },

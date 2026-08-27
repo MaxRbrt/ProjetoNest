@@ -31,11 +31,16 @@ export class ActionTokensService {
     private readonly sessions: SessionsService,
   ) {}
 
+  // ---------------------------------------------
+  // Emissão de token de verificação de email
+  // ---------------------------------------------
   async issueEmailVerification(
     manager: EntityManager,
     userId: string,
     now: Date,
   ): Promise<IssuedActionToken | null> {
+    // O lock serializa reenvios concorrentes para que o cooldown não seja
+    // contornado por duas requisições simultâneas.
     const latest = await manager.findOne(AuthActionToken, {
       where: {
         userId,
@@ -71,6 +76,9 @@ export class ActionTokensService {
     );
   }
 
+  // ---------------------------------------------
+  // Emissão de token de recuperação de senha
+  // ---------------------------------------------
   async issuePasswordReset(
     manager: EntityManager,
     userId: string,
@@ -99,6 +107,9 @@ export class ActionTokensService {
     );
   }
 
+  // ---------------------------------------------
+  // Consumo de token de verificação de email
+  // ---------------------------------------------
   verifyEmail(rawToken: string, now = new Date()): Promise<void> {
     return this.actionTokensRepository.manager.transaction(async (manager) => {
       const candidate = await this.findCandidate(
@@ -107,6 +118,8 @@ export class ActionTokensService {
         AuthActionTokenType.EMAIL_VERIFICATION,
         now,
       );
+      // A ordem usuário -> token é mantida nos fluxos de consumo para evitar
+      // deadlocks quando duas ações da mesma conta concorrem.
       const user = await manager.findOne(User, {
         where: { id: candidate.action.userId },
         lock: { mode: 'pessimistic_write' },
@@ -114,6 +127,8 @@ export class ActionTokensService {
       if (!user) {
         throw new BadRequestException(INVALID_ACTION_TOKEN);
       }
+      // O candidato foi lido sem lock; a segunda leitura trava e revalida o
+      // token para impedir uso duplo entre as duas consultas.
       const action = await this.lockForUse(
         manager,
         candidate,
@@ -138,6 +153,9 @@ export class ActionTokensService {
     });
   }
 
+  // ---------------------------------------------
+  // Consumo de token e redefinição de senha
+  // ---------------------------------------------
   resetPassword(
     rawToken: string,
     passwordHash: string,
@@ -150,6 +168,8 @@ export class ActionTokensService {
         AuthActionTokenType.PASSWORD_RESET,
         now,
       );
+      // Repete a ordem de locks do fluxo de verificação para que ações da
+      // mesma conta não se bloqueiem em ordem inversa.
       const user = await manager.findOne(User, {
         where: { id: candidate.action.userId },
         lock: { mode: 'pessimistic_write' },
@@ -184,6 +204,9 @@ export class ActionTokensService {
     });
   }
 
+  // ---------------------------------------------
+  // Persistência segura de tokens de ação
+  // ---------------------------------------------
   private async createWithManager(
     manager: EntityManager,
     userId: string,
@@ -208,6 +231,9 @@ export class ActionTokensService {
     };
   }
 
+  // ---------------------------------------------
+  // Busca, lock e validação para uso único
+  // ---------------------------------------------
   private async findCandidate(
     manager: EntityManager,
     rawToken: string,

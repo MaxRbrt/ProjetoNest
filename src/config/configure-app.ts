@@ -3,13 +3,23 @@ import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
+// ---------------------------------------------
+// Configuração global da camada HTTP
+// ---------------------------------------------
 export function configureApp(app: INestApplication): void {
   const config = app.get(ConfigService);
   const frontendOrigin = new URL(config.getOrThrow<string>('FRONTEND_URL'))
     .origin;
 
+  // ---------------------------------------------
+  // Cabeçalhos de segurança e leitura de cookies
+  // ---------------------------------------------
   app.use(helmet());
   app.use(cookieParser());
+
+  // ---------------------------------------------
+  // Validação e transformação dos payloads
+  // ---------------------------------------------
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,6 +27,10 @@ export function configureApp(app: INestApplication): void {
       transform: true,
     }),
   );
+
+  // ---------------------------------------------
+  // Acesso do frontend autorizado
+  // ---------------------------------------------
   app.enableCors({
     origin: [frontendOrigin],
     credentials: true,

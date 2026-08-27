@@ -56,11 +56,16 @@ export class AuthService {
     this.minimumResponseMs = config.getOrThrow<number>('AUTH_MIN_RESPONSE_MS');
   }
 
+  // ---------------------------------------------
+  // Cadastro de usuário
+  // ---------------------------------------------
   async register(
     dto: RegisterDto,
     now = new Date(),
   ): Promise<typeof GENERIC_ACCEPTED_RESPONSE> {
     const startedAt = Date.now();
+    // O Argon2 roda antes da transação para não manter locks durante uma
+    // operação deliberadamente cara de CPU e memória.
     const passwordHash = await this.passwords.hash(dto.password);
     let job: EmailJob | null;
 
@@ -69,6 +74,8 @@ export class AuthService {
         this.prepareRegistration(manager, dto.email, passwordHash, now),
       );
     } catch (error) {
+      // A restrição única resolve a corrida entre cadastros simultâneos; nesse
+      // caso, o fluxo reaproveita a resposta genérica sem revelar a conta.
       if (!this.isEmailUniqueViolation(error)) {
         throw error;
       }
@@ -84,6 +91,9 @@ export class AuthService {
     return GENERIC_ACCEPTED_RESPONSE;
   }
 
+  // ---------------------------------------------
+  // Reenvio e confirmação de email
+  // ---------------------------------------------
   async resendVerification(
     dto: ResendVerificationDto,
     now = new Date(),
@@ -103,10 +113,15 @@ export class AuthService {
     return this.actionTokens.verifyEmail(dto.token, now);
   }
 
+  // ---------------------------------------------
+  // Login e emissão de sessão
+  // ---------------------------------------------
   async login(dto: LoginDto, now = new Date()): Promise<AuthenticatedSession> {
     const startedAt = Date.now();
     const result = await this.usersRepository.manager.transaction(
       async (manager): Promise<LoginResult> => {
+        // O lock serializa tentativas concorrentes para que a contagem de
+        // falhas e o bloqueio temporário não percam atualizações.
         const user = await manager.findOne(User, {
           where: { email: dto.email },
           select: {
@@ -176,6 +191,8 @@ export class AuthService {
     );
 
     if (result.status === 'missing' || result.status === 'locked') {
+      // Mesmo sem um hash real disponível, executa Argon2 para aproximar o
+      // custo temporal do caminho percorrido por uma conta existente.
       await this.passwords.verifyDummy(dto.password);
     }
     await this.completeAtLeast(startedAt);
@@ -203,6 +220,9 @@ export class AuthService {
     return this.sessions.complete(result.persisted);
   }
 
+  // ---------------------------------------------
+  // Renovação e encerramento de sessão
+  // ---------------------------------------------
   refresh(rawToken: string, now = new Date()): Promise<AuthenticatedSession> {
     return this.sessions.refresh(rawToken, now);
   }
@@ -211,6 +231,9 @@ export class AuthService {
     return this.sessions.logout(rawToken, now);
   }
 
+  // ---------------------------------------------
+  // Recuperação de senha
+  // ---------------------------------------------
   async forgotPassword(
     dto: ForgotPasswordDto,
     now = new Date(),
@@ -242,10 +265,15 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto, now = new Date()): Promise<void> {
+    // A nova senha é validada e derivada antes de consumir o token; uma senha
+    // rejeitada ainda permite outra tentativa com o mesmo link.
     const passwordHash = await this.passwords.hash(dto.newPassword);
     await this.actionTokens.resetPassword(dto.token, passwordHash, now);
   }
 
+  // ---------------------------------------------
+  // Preparação de cadastro e verificação
+  // ---------------------------------------------
   private async prepareRegistration(
     manager: EntityManager,
     email: string,
@@ -299,6 +327,9 @@ export class AuthService {
     return issued ? { ...issued, recipient: user.email } : null;
   }
 
+  // ---------------------------------------------
+  // Envio de emails de autenticação
+  // ---------------------------------------------
   private async sendVerification(job: EmailJob): Promise<void> {
     try {
       await this.email.sendEmailVerification({
@@ -323,6 +354,9 @@ export class AuthService {
     }
   }
 
+  // ---------------------------------------------
+  // Uniformização temporal das respostas
+  // ---------------------------------------------
   private async completeAtLeast(startedAt: number): Promise<void> {
     const remaining = this.minimumResponseMs - (Date.now() - startedAt);
     if (remaining > 0) {
@@ -330,6 +364,9 @@ export class AuthService {
     }
   }
 
+  // ---------------------------------------------
+  // Identificação de conflito de email
+  // ---------------------------------------------
   private isEmailUniqueViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;

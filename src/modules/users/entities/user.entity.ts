@@ -13,6 +13,9 @@ import {
 @Check('CHK_users_failed_login_attempts', '"failedLoginAttempts" >= 0')
 @Check('CHK_users_email_normalized', '"email" = lower(btrim("email"))')
 export class User {
+  // ---------------------------------------------
+  // Identidade e credencial
+  // ---------------------------------------------
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -22,6 +25,9 @@ export class User {
   @Column({ type: 'text', select: false })
   passwordHash: string;
 
+  // ---------------------------------------------
+  // Verificação e bloqueio da conta
+  // ---------------------------------------------
   @Column({ type: 'timestamptz', nullable: true })
   emailVerifiedAt: Date | null;
 
@@ -31,6 +37,9 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   lockedUntil: Date | null;
 
+  // ---------------------------------------------
+  // Auditoria temporal
+  // ---------------------------------------------
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

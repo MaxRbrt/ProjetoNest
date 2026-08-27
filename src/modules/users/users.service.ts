@@ -17,11 +17,19 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
+  // ---------------------------------------------
+  // Busca de usuário por identificador
+  // ---------------------------------------------
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOneBy({ id });
   }
 
+  // ---------------------------------------------
+  // Busca de credencial por email
+  // ---------------------------------------------
   findByEmailWithPassword(email: string): Promise<User | null> {
+    // passwordHash tem select: false na entidade e só entra em consultas que
+    // precisam autenticar uma credencial explicitamente.
     return this.usersRepository
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
@@ -29,6 +37,9 @@ export class UsersService {
       .getOne();
   }
 
+  // ---------------------------------------------
+  // Projeção pública do usuário
+  // ---------------------------------------------
   toPublicUser(user: User): PublicUser {
     return {
       id: user.id,

@@ -68,6 +68,9 @@ describe('SessionsService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Criação de sessão
+  // ---------------------------------------------
   it('cria sessão absoluta e persiste somente o hash do refresh', async () => {
     const now = new Date('2026-08-26T12:00:00.000Z');
     const result = await service.create(user, now);
@@ -92,6 +95,9 @@ describe('SessionsService', () => {
     expect(savedRefresh).not.toHaveProperty('rawToken');
   });
 
+  // ---------------------------------------------
+  // Rotação e proteção do refresh token
+  // ---------------------------------------------
   it('rotaciona refresh sob transação e vincula a geração seguinte', async () => {
     const original = opaqueTokens.generate();
     const session = Object.assign(new AuthSession(), {
@@ -202,6 +208,9 @@ describe('SessionsService', () => {
     expect(accessTokens.issue).not.toHaveBeenCalled();
   });
 
+  // ---------------------------------------------
+  // Encerramento de sessão
+  // ---------------------------------------------
   it('logout trava sessão antes do refresh token e revalida o candidato', async () => {
     const original = opaqueTokens.generate();
     const session = Object.assign(new AuthSession(), {
