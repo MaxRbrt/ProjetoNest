@@ -8,6 +8,9 @@ describe('UsersService', () => {
   } as unknown as Repository<User>;
   const service = new UsersService(repository);
 
+  // ---------------------------------------------
+  // Exposição segura dos dados do usuário
+  // ---------------------------------------------
   it('expõe somente os campos públicos do usuário', () => {
     const user = Object.assign(new User(), {
       id: 'f2fa55e8-9bb4-4d42-8545-1ecae77bc327',
@@ -29,7 +32,7 @@ describe('UsersService', () => {
     expect(service.toPublicUser(user)).not.toHaveProperty('passwordHash');
   });
 
-  it('representa email pendente sem expor o timestamp interno', () => {
+  it('representa email pendente sem expor a data interna de verificação', () => {
     const user = Object.assign(new User(), {
       id: 'f2fa55e8-9bb4-4d42-8545-1ecae77bc327',
       email: 'usuario@example.com',
@@ -41,6 +44,9 @@ describe('UsersService', () => {
     expect(service.toPublicUser(user)).not.toHaveProperty('emailVerifiedAt');
   });
 
+  // ---------------------------------------------
+  // Exposição do papel de acesso
+  // ---------------------------------------------
   it('expõe o papel do usuário no PublicUser', () => {
     const user = Object.assign(new User(), {
       id: '6f5c2c1e-9c4a-4c1a-9f1a-2b3c4d5e6f70',
