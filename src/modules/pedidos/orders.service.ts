@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../produtos/entities/product.entity';
+import { Role } from '../usuarios/entities/user.entity';
+import { PublicUser } from '../usuarios/users.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
 @Injectable()
@@ -20,16 +22,22 @@ export class OrdersService {
   // ---------------------------------------------
   // Listagem de pedidos
   // ---------------------------------------------
-  findAll(): Promise<Order[]> {
-    return this.ordersRepository.find({ relations: { items: true } });
+  // Administrador enxerga todos; cliente enxerga apenas os próprios.
+  findAll(user: PublicUser): Promise<Order[]> {
+    return this.ordersRepository.find({
+      where: user.role === Role.ADMIN ? {} : { userId: user.id },
+      relations: { items: true },
+    });
   }
 
   // ---------------------------------------------
   // Consulta de pedido por identificador
   // ---------------------------------------------
-  async findOne(id: number): Promise<Order> {
+  // O filtro de dono entra na própria consulta: pedido alheio não é encontrado
+  // e resulta em 404. Um 403 revelaria que o pedido existe.
+  async findOne(id: number, user: PublicUser): Promise<Order> {
     const order = await this.ordersRepository.findOne({
-      where: { id },
+      where: user.role === Role.ADMIN ? { id } : { id, userId: user.id },
       relations: { items: true },
     });
     if (!order) {
@@ -41,7 +49,7 @@ export class OrdersService {
   // ---------------------------------------------
   // Criação de pedido com baixa de estoque
   // ---------------------------------------------
-  create(dto: CreateOrderDto): Promise<Order> {
+  create(dto: CreateOrderDto, user: PublicUser): Promise<Order> {
     // Pedido, itens e baixas de estoque formam uma única unidade: qualquer
     // falha desfaz todas as alterações da transação.
     return this.ordersRepository.manager.transaction(async (manager) => {
@@ -83,7 +91,7 @@ export class OrdersService {
         await manager.save(product);
       }
 
-      const order = manager.create(Order, { total, items });
+      const order = manager.create(Order, { total, items, userId: user.id });
       return manager.save(order);
     });
   }
