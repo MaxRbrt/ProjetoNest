@@ -1,5 +1,8 @@
 type Environment = Record<string, unknown>;
 
+// ---------------------------------------------
+// Variáveis obrigatórias
+// ---------------------------------------------
 const REQUIRED_KEYS = [
   'DATABASE_URL',
   'JWT_SECRET',
@@ -12,6 +15,9 @@ const REQUIRED_KEYS = [
 
 const PLACEHOLDER_PATTERN = /(replace|placeholder|change[-_ ]?me)/i;
 
+// ---------------------------------------------
+// Normalização de números positivos
+// ---------------------------------------------
 function asPositiveInteger(
   value: unknown,
   fallback: number,
@@ -31,6 +37,9 @@ function asPositiveInteger(
   return parsed;
 }
 
+// ---------------------------------------------
+// Validação de URL por protocolo
+// ---------------------------------------------
 function isValidUrl(value: string, protocols: string[]): boolean {
   try {
     return protocols.includes(new URL(value).protocol);
@@ -39,11 +48,17 @@ function isValidUrl(value: string, protocols: string[]): boolean {
   }
 }
 
+// ---------------------------------------------
+// Validação completa do ambiente
+// ---------------------------------------------
 export function validateEnvironment(input: Environment): Environment {
   const environment = { ...input };
   const errors: string[] = [];
   const nodeEnvironment = String(environment.NODE_ENV ?? 'development');
 
+  // ---------------------------------------------
+  // Ambiente e presença das chaves
+  // ---------------------------------------------
   if (!['development', 'test', 'production'].includes(nodeEnvironment)) {
     errors.push('NODE_ENV deve ser development, test ou production');
   }
@@ -54,6 +69,9 @@ export function validateEnvironment(input: Environment): Environment {
     }
   }
 
+  // ---------------------------------------------
+  // Banco de dados e credenciais externas
+  // ---------------------------------------------
   const databaseUrl = String(environment.DATABASE_URL ?? '');
   if (databaseUrl && !isValidUrl(databaseUrl, ['postgres:', 'postgresql:'])) {
     errors.push('DATABASE_URL deve ser uma URL PostgreSQL válida');
@@ -74,6 +92,9 @@ export function validateEnvironment(input: Environment): Environment {
     errors.push('RESEND_API_KEY deve ser uma chave real do Resend');
   }
 
+  // ---------------------------------------------
+  // URLs públicas e integração de senhas vazadas
+  // ---------------------------------------------
   const frontendUrl = String(environment.FRONTEND_URL ?? '');
   if (frontendUrl && !isValidUrl(frontendUrl, ['http:', 'https:'])) {
     errors.push('FRONTEND_URL deve ser uma URL HTTP válida');
@@ -92,6 +113,9 @@ export function validateEnvironment(input: Environment): Environment {
     errors.push('HIBP_API_URL deve ser uma URL HTTPS válida');
   }
 
+  // ---------------------------------------------
+  // Limites temporais de segurança
+  // ---------------------------------------------
   const hibpTimeoutMs = asPositiveInteger(
     environment.HIBP_TIMEOUT_MS,
     3000,
@@ -105,10 +129,13 @@ export function validateEnvironment(input: Environment): Environment {
     errors,
   );
 
+  // Todos os problemas são acumulados para corrigir a configuração em uma
+  // única inicialização, em vez de falhar uma vez por variável.
   if (errors.length > 0) {
     throw new Error(`Configuração inválida: ${errors.join('; ')}`);
   }
 
+  // Os defaults validados voltam no mesmo objeto consumido pelo ConfigModule.
   return {
     ...environment,
     NODE_ENV: nodeEnvironment,

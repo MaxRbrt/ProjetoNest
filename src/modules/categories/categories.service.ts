@@ -16,10 +16,16 @@ export class CategoriesService {
     private readonly categoriesRepository: Repository<Category>,
   ) {}
 
+  // ---------------------------------------------
+  // Listagem de categorias
+  // ---------------------------------------------
   findAll(): Promise<Category[]> {
     return this.categoriesRepository.find();
   }
 
+  // ---------------------------------------------
+  // Consulta de categoria por identificador
+  // ---------------------------------------------
   async findOne(id: number): Promise<Category> {
     const category = await this.categoriesRepository.findOneBy({ id });
     if (!category) {
@@ -28,17 +34,25 @@ export class CategoriesService {
     return category;
   }
 
+  // ---------------------------------------------
+  // Criação de categoria
+  // ---------------------------------------------
   create(dto: CreateCategoryDto): Promise<Category> {
     const category = this.categoriesRepository.create(dto);
     return this.categoriesRepository.save(category);
   }
 
+  // ---------------------------------------------
+  // Remoção com checagem de produtos
+  // ---------------------------------------------
   async remove(id: number): Promise<void> {
     const category = await this.findOne(id);
     const productsCount = await this.categoriesRepository.manager.countBy(
       Product,
       { categoryId: id },
     );
+    // A checagem explícita devolve um conflito de domínio antes que a chave
+    // estrangeira rejeite a exclusão com um erro de infraestrutura.
     if (productsCount > 0) {
       throw new ConflictException(
         `Não é possível remover a categoria ${id}: existem produtos vinculados a ela`,

@@ -12,6 +12,9 @@ export interface ResendClient {
   };
 }
 
+// ---------------------------------------------
+// Criação do cliente de email
+// ---------------------------------------------
 export function createResendClient(config: ConfigService): ResendClient {
   return new Resend(config.getOrThrow<string>('RESEND_API_KEY'));
 }

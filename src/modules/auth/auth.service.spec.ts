@@ -96,6 +96,9 @@ describe('AuthService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Cadastro e reenvio de verificação
+  // ---------------------------------------------
   it('cadastra usuário pendente e envia verificação fora da transação', async () => {
     manager.findOne.mockResolvedValue(null);
 
@@ -141,6 +144,9 @@ describe('AuthService', () => {
     expect(email.sendEmailVerification).not.toHaveBeenCalled();
   });
 
+  // ---------------------------------------------
+  // Login e proteção contra enumeração de contas
+  // ---------------------------------------------
   it('executa Argon2 fictício e retorna 401 para email inexistente', async () => {
     manager.findOne.mockResolvedValue(null);
 
@@ -260,6 +266,9 @@ describe('AuthService', () => {
     expect(sessions.createWithManager).not.toHaveBeenCalled();
   });
 
+  // ---------------------------------------------
+  // Recuperação de senha
+  // ---------------------------------------------
   it('envia reset somente para usuário verificado e sem token ativo', async () => {
     const user = Object.assign(new User(), {
       id: 'f2fa55e8-9bb4-4d42-8545-1ecae77bc327',
@@ -297,6 +306,9 @@ describe('AuthService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Verificação de email
+  // ---------------------------------------------
   it('delega verificação de email preservando uso único', async () => {
     await service.verifyEmail({ token: 'V'.repeat(43) }, now);
 

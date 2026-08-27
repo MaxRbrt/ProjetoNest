@@ -16,7 +16,12 @@ const DUMMY_PASSWORD_HASH =
 export class PasswordService {
   constructor(private readonly pwnedPasswords: PwnedPasswordsService) {}
 
+  // ---------------------------------------------
+  // Validação e derivação de senha
+  // ---------------------------------------------
   async hash(password: string): Promise<string> {
+    // Array.from conta pontos de código Unicode, evitando tratar um caractere
+    // fora do BMP como duas unidades UTF-16.
     const length = Array.from(password).length;
     if (length < 15 || length > 128) {
       throw new BadRequestException(
@@ -33,10 +38,16 @@ export class PasswordService {
     return argon2.hash(password, ARGON2_OPTIONS);
   }
 
+  // ---------------------------------------------
+  // Verificação de credencial
+  // ---------------------------------------------
   verify(passwordHash: string, password: string): Promise<boolean> {
     return argon2.verify(passwordHash, password);
   }
 
+  // ---------------------------------------------
+  // Proteção temporal para conta inexistente
+  // ---------------------------------------------
   verifyDummy(password: string): Promise<boolean> {
     return argon2.verify(DUMMY_PASSWORD_HASH, password);
   }

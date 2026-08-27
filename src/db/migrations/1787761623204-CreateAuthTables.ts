@@ -3,7 +3,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class CreateAuthTables1787761623204 implements MigrationInterface {
   name = 'CreateAuthTables1787761623204';
 
+  // ---------------------------------------------
+  // Criação da estrutura de autenticação
+  // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // ---------------------------------------------
+    // Usuários e unicidade de email
+    // ---------------------------------------------
     await queryRunner.query(`
             CREATE TABLE "users" (
                 "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -22,6 +28,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             CREATE UNIQUE INDEX "UQ_users_email" ON "users" ("email")
         `);
+    // ---------------------------------------------
+    // Tokens de verificação e recuperação
+    // ---------------------------------------------
     await queryRunner.query(`
             CREATE TABLE "auth_action_tokens" (
                 "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -43,6 +52,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             CREATE UNIQUE INDEX "UQ_auth_action_tokens_token_hash" ON "auth_action_tokens" ("tokenHash")
         `);
+    // ---------------------------------------------
+    // Sessões autenticadas
+    // ---------------------------------------------
     await queryRunner.query(`
             CREATE TABLE "auth_sessions" (
                 "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -60,6 +72,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             CREATE INDEX "IDX_auth_sessions_active_user" ON "auth_sessions" ("userId") WHERE "revokedAt" IS NULL
         `);
+    // ---------------------------------------------
+    // Cadeia de rotação dos refresh tokens
+    // ---------------------------------------------
     await queryRunner.query(`
             CREATE TABLE "refresh_tokens" (
                 "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -79,6 +94,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             CREATE UNIQUE INDEX "UQ_refresh_tokens_token_hash" ON "refresh_tokens" ("tokenHash")
         `);
+    // ---------------------------------------------
+    // Integridade referencial da autenticação
+    // ---------------------------------------------
     await queryRunner.query(`
             ALTER TABLE "auth_action_tokens"
             ADD CONSTRAINT "FK_89417bcf63ea9df4edded65aee2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION
@@ -96,6 +114,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
             ADD CONSTRAINT "FK_6077443266dc1dde0ac43b6f727" FOREIGN KEY ("replacedByTokenId") REFERENCES "refresh_tokens"("id") ON DELETE
             SET NULL ON UPDATE NO ACTION
         `);
+    // ---------------------------------------------
+    // Isolamento das tabelas sensíveis
+    // ---------------------------------------------
     await queryRunner.query(`ALTER TABLE "users" ENABLE ROW LEVEL SECURITY`);
     await queryRunner.query(
       `ALTER TABLE "auth_sessions" ENABLE ROW LEVEL SECURITY`,
@@ -109,6 +130,8 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             REVOKE ALL ON TABLE "users", "auth_sessions", "refresh_tokens", "auth_action_tokens" FROM PUBLIC
         `);
+    // Os papéis podem não existir fora do Supabase; o bloco condicional mantém
+    // a migration portável sem abrir acesso quando eles estão presentes.
     await queryRunner.query(`
             DO $$
             BEGIN
@@ -123,7 +146,12 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
         `);
   }
 
+  // ---------------------------------------------
+  // Remoção da estrutura de autenticação
+  // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Chaves, índices e tabelas saem em ordem inversa para não deixar nenhuma
+    // dependência apontando para um objeto já removido.
     await queryRunner.query(`
             ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_6077443266dc1dde0ac43b6f727"
         `);

@@ -46,6 +46,9 @@ export class AuthController {
     private readonly refreshCookies: RefreshCookieService,
   ) {}
 
+  // ---------------------------------------------
+  // Cadastro de usuário
+  // ---------------------------------------------
   @Post('register')
   @HttpCode(202)
   @Throttle({ default: { limit: 5, ttl: minutes(15) } })
@@ -53,12 +56,18 @@ export class AuthController {
     return this.auth.register(dto);
   }
 
+  // ---------------------------------------------
+  // Verificação de email
+  // ---------------------------------------------
   @Post('verify-email')
   @HttpCode(204)
   verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
     return this.auth.verifyEmail(dto);
   }
 
+  // ---------------------------------------------
+  // Reenvio de verificação de email
+  // ---------------------------------------------
   @Post('resend-verification')
   @HttpCode(202)
   @Throttle({ default: { limit: 3, ttl: hours(1) } })
@@ -66,6 +75,9 @@ export class AuthController {
     return this.auth.resendVerification(dto);
   }
 
+  // ---------------------------------------------
+  // Login e emissão de sessão
+  // ---------------------------------------------
   @Post('login')
   @HttpCode(200)
   @UseGuards(OriginGuard)
@@ -79,6 +91,9 @@ export class AuthController {
     return this.toResponse(session);
   }
 
+  // ---------------------------------------------
+  // Rotação de refresh token
+  // ---------------------------------------------
   @Post('refresh')
   @HttpCode(200)
   @UseGuards(OriginGuard)
@@ -103,6 +118,9 @@ export class AuthController {
     }
   }
 
+  // ---------------------------------------------
+  // Encerramento de sessão
+  // ---------------------------------------------
   @Post('logout')
   @HttpCode(204)
   @UseGuards(OriginGuard)
@@ -114,12 +132,18 @@ export class AuthController {
     this.refreshCookies.clear(response);
   }
 
+  // ---------------------------------------------
+  // Consulta do usuário autenticado
+  // ---------------------------------------------
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest): PublicUser {
     return request.user;
   }
 
+  // ---------------------------------------------
+  // Recuperação de senha
+  // ---------------------------------------------
   @Post('forgot-password')
   @HttpCode(202)
   @Throttle({ default: { limit: 3, ttl: hours(1) } })
@@ -134,6 +158,9 @@ export class AuthController {
     return this.auth.resetPassword(dto);
   }
 
+  // ---------------------------------------------
+  // Transporte seguro do refresh token
+  // ---------------------------------------------
   private readRefreshCookie(request: Request): string | undefined {
     const value: unknown = request.cookies?.[REFRESH_COOKIE_NAME];
     return typeof value === 'string' ? value : undefined;

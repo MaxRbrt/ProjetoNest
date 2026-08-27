@@ -18,21 +18,33 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  // ---------------------------------------------
+  // Listagem de produtos
+  // ---------------------------------------------
   @Get()
   findAll(): Promise<Product[]> {
     return this.productsService.findAll();
   }
 
+  // ---------------------------------------------
+  // Consulta de produto por identificador
+  // ---------------------------------------------
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Product> {
     return this.productsService.findOne(id);
   }
 
+  // ---------------------------------------------
+  // Criação de produto
+  // ---------------------------------------------
   @Post()
   create(@Body() dto: CreateProductDto): Promise<Product> {
     return this.productsService.create(dto);
   }
 
+  // ---------------------------------------------
+  // Atualização de produto
+  // ---------------------------------------------
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -41,6 +53,9 @@ export class ProductsController {
     return this.productsService.update(id, dto);
   }
 
+  // ---------------------------------------------
+  // Remoção de produto
+  // ---------------------------------------------
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
