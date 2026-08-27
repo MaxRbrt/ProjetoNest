@@ -7,7 +7,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   // ---------------------------------------------
-  // Health check
+  // Verificação de disponibilidade
   // ---------------------------------------------
   @Public()
   @Get()

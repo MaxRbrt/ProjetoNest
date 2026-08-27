@@ -29,7 +29,7 @@ export function configureApp(app: INestApplication): void {
   );
 
   // ---------------------------------------------
-  // Acesso do frontend autorizado
+  // Acesso autorizado da aplicação cliente
   // ---------------------------------------------
   app.enableCors({
     origin: [frontendOrigin],

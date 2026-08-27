@@ -23,6 +23,9 @@ export enum AuthActionTokenType {
   `"type" IN ('EMAIL_VERIFICATION', 'PASSWORD_RESET')`,
 )
 export class AuthActionToken {
+  // ---------------------------------------------
+  // Identidade e vínculo com o usuário
+  // ---------------------------------------------
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -33,12 +36,18 @@ export class AuthActionToken {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  // ---------------------------------------------
+  // Finalidade e segredo persistido
+  // ---------------------------------------------
   @Column({ type: 'varchar', length: 32 })
   type: AuthActionTokenType;
 
   @Column({ type: 'char', length: 64, select: false })
   tokenHash: string;
 
+  // ---------------------------------------------
+  // Validade, consumo e auditoria
+  // ---------------------------------------------
   @Column({ type: 'timestamptz' })
   expiresAt: Date;
 

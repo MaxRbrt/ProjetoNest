@@ -5,6 +5,9 @@ import { OrdersService } from './orders.service';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 
+// ---------------------------------------------
+// Composição do módulo de pedidos
+// ---------------------------------------------
 @Module({
   imports: [TypeOrmModule.forFeature([Order, OrderItem])],
   controllers: [OrdersController],

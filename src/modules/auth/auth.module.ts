@@ -24,6 +24,9 @@ import { SessionsService } from './services/sessions.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
+  // ---------------------------------------------
+  // Persistência e integrações da autenticação
+  // ---------------------------------------------
   imports: [
     TypeOrmModule.forFeature([
       User,
@@ -33,6 +36,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     ]),
     UsersModule,
     EmailModule,
+
+    // ---------------------------------------------
+    // Estratégia e configuração JWT
+    // ---------------------------------------------
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -52,6 +59,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
+
+  // ---------------------------------------------
+  // Casos de uso e fronteira HTTP
+  // ---------------------------------------------
   controllers: [AuthController],
   providers: [
     AuthService,

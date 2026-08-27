@@ -14,6 +14,9 @@ describe('PasswordService', () => {
     service = new PasswordService(pwnedPasswords);
   });
 
+  // ---------------------------------------------
+  // Derivação e preservação da senha
+  // ---------------------------------------------
   it('gera Argon2id com os parâmetros aprovados e valida o hash', async () => {
     const password = 'uma frase-senha segura';
     const passwordHash = await service.hash(password);
@@ -36,6 +39,9 @@ describe('PasswordService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Regras de tamanho e exposição em vazamentos
+  // ---------------------------------------------
   it.each(['a'.repeat(14), 'a'.repeat(129)])(
     'rejeita senha fora de 15 a 128 caracteres',
     async (password) => {
@@ -60,6 +66,9 @@ describe('PasswordService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Proteção contra diferença de tempo observável
+  // ---------------------------------------------
   it('executa verificação Argon2 fictícia para contas inexistentes', async () => {
     await expect(service.verifyDummy('qualquer tentativa')).resolves.toBe(
       false,

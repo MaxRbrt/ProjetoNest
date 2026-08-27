@@ -6,6 +6,9 @@ import { ResetPasswordDto } from './reset-password.dto';
 import { VerifyEmailDto } from './verify-email.dto';
 
 describe('DTOs de autenticação', () => {
+  // ---------------------------------------------
+  // Normalização de email e preservação da senha
+  // ---------------------------------------------
   it('normaliza email sem alterar a senha', async () => {
     const input = {
       email: '  Usuario@Example.COM  ',
@@ -29,6 +32,9 @@ describe('DTOs de autenticação', () => {
     expect(dto.password).toBe('senha fornecida sem trim');
   });
 
+  // ---------------------------------------------
+  // Validação de tokens e nova senha
+  // ---------------------------------------------
   it('rejeita token que não seja base64url de 256 bits', async () => {
     const dto = plainToInstance(VerifyEmailDto, { token: 'token curto' });
 

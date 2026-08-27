@@ -10,12 +10,18 @@ import { Product } from '../../produtos/entities/product.entity';
 
 @Entity('order_items')
 export class OrderItem {
+  // ---------------------------------------------
+  // Identificação e quantidade
+  // ---------------------------------------------
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
   quantity: number;
 
+  // ---------------------------------------------
+  // Vínculo com o pedido
+  // ---------------------------------------------
   @Column()
   orderId: number;
 
@@ -23,6 +29,9 @@ export class OrderItem {
   @JoinColumn({ name: 'orderId' })
   order: Order;
 
+  // ---------------------------------------------
+  // Vínculo com o produto
+  // ---------------------------------------------
   @Column()
   productId: number;
 

@@ -33,9 +33,9 @@ export class User {
   // ---------------------------------------------
   // Papel de acesso
   // ---------------------------------------------
-  // Nunca preenchido a partir de dados de request: RegisterDto não declara o
-  // campo e o ValidationPipe global rejeita propriedade não declarada.
-  // Promoção a ADMIN acontece apenas via script de seed.
+  // O papel vem da persistência, nunca do corpo da requisição: RegisterDto não
+  // declara o campo e o ValidationPipe global rejeita propriedade não declarada.
+  // A promoção a ADMIN exige um fluxo administrativo controlado.
   @Column({ type: 'enum', enum: Role, default: Role.CLIENTE })
   role: Role;
 

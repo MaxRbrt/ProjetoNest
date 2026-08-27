@@ -18,11 +18,17 @@ describe('RolesGuard', () => {
       getAllAndOverride: jest.fn().mockReturnValue(roles),
     }) as unknown as Reflector;
 
+  // ---------------------------------------------
+  // Rotas sem restrição de papel
+  // ---------------------------------------------
   it('libera rota sem exigência de papel', () => {
     const guard = new RolesGuard(reflectorCom(undefined));
     expect(guard.canActivate(contextComUsuario(Role.CLIENTE))).toBe(true);
   });
 
+  // ---------------------------------------------
+  // Autorização pelo papel do usuário
+  // ---------------------------------------------
   it('libera quando o usuário tem o papel exigido', () => {
     const guard = new RolesGuard(reflectorCom([Role.ADMIN]));
     expect(guard.canActivate(contextComUsuario(Role.ADMIN))).toBe(true);

@@ -1,6 +1,9 @@
 import { createDataSourceOptions } from './database-options';
 
 describe('createDataSourceOptions', () => {
+  // ---------------------------------------------
+  // Configuração da conexão principal
+  // ---------------------------------------------
   it('usa DATABASE_URL fora do ambiente de teste', () => {
     const options = createDataSourceOptions({
       NODE_ENV: 'development',
@@ -17,6 +20,9 @@ describe('createDataSourceOptions', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Isolamento do banco de testes
+  // ---------------------------------------------
   it('recusa testes sem um banco isolado', () => {
     expect(() =>
       createDataSourceOptions({

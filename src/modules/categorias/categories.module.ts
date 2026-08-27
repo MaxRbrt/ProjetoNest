@@ -4,6 +4,9 @@ import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
 
+// ---------------------------------------------
+// Composição do módulo de categorias
+// ---------------------------------------------
 @Module({
   imports: [TypeOrmModule.forFeature([Category])],
   controllers: [CategoriesController],

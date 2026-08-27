@@ -39,8 +39,8 @@ export class ActionTokensService {
     userId: string,
     now: Date,
   ): Promise<IssuedActionToken | null> {
-    // O lock serializa reenvios concorrentes para que o cooldown não seja
-    // contornado por duas requisições simultâneas.
+    // O bloqueio serializa reenvios concorrentes para que o intervalo mínimo
+    // não seja contornado por duas requisições simultâneas.
     const latest = await manager.findOne(AuthActionToken, {
       where: {
         userId,
@@ -119,7 +119,7 @@ export class ActionTokensService {
         now,
       );
       // A ordem usuário -> token é mantida nos fluxos de consumo para evitar
-      // deadlocks quando duas ações da mesma conta concorrem.
+      // interbloqueios quando duas ações da mesma conta concorrem.
       const user = await manager.findOne(User, {
         where: { id: candidate.action.userId },
         lock: { mode: 'pessimistic_write' },
@@ -127,8 +127,8 @@ export class ActionTokensService {
       if (!user) {
         throw new BadRequestException(INVALID_ACTION_TOKEN);
       }
-      // O candidato foi lido sem lock; a segunda leitura trava e revalida o
-      // token para impedir uso duplo entre as duas consultas.
+      // O candidato foi lido sem bloqueio; a segunda leitura trava e revalida
+      // o token para impedir uso duplo entre as duas consultas.
       const action = await this.lockForUse(
         manager,
         candidate,
@@ -168,7 +168,7 @@ export class ActionTokensService {
         AuthActionTokenType.PASSWORD_RESET,
         now,
       );
-      // Repete a ordem de locks do fluxo de verificação para que ações da
+      // Repete a ordem de bloqueios do fluxo de verificação para que ações da
       // mesma conta não se bloqueiem em ordem inversa.
       const user = await manager.findOne(User, {
         where: { id: candidate.action.userId },
@@ -232,7 +232,7 @@ export class ActionTokensService {
   }
 
   // ---------------------------------------------
-  // Busca, lock e validação para uso único
+  // Busca, bloqueio e validação para uso único
   // ---------------------------------------------
   private async findCandidate(
     manager: EntityManager,

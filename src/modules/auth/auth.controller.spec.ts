@@ -38,6 +38,9 @@ describe('AuthController', () => {
     response = {} as Response;
   });
 
+  // ---------------------------------------------
+  // Login e transporte do refresh token
+  // ---------------------------------------------
   it('login envia refresh só no cookie e o omite do JSON', async () => {
     const body = await controller.login(
       { email: 'usuario@example.com', password: 'frase senha segura' },
@@ -59,6 +62,9 @@ describe('AuthController', () => {
     expect(body).not.toHaveProperty('refreshExpiresAt');
   });
 
+  // ---------------------------------------------
+  // Rotação de refresh token
+  // ---------------------------------------------
   it('refresh lê somente o cookie HttpOnly e o rotaciona', async () => {
     const request = {
       cookies: { refresh_token: 'refresh-anterior' },
@@ -87,6 +93,9 @@ describe('AuthController', () => {
     expect(cookies.clear).toHaveBeenCalledWith(response);
   });
 
+  // ---------------------------------------------
+  // Encerramento idempotente de sessão
+  // ---------------------------------------------
   it('logout é idempotente inclusive sem cookie', async () => {
     const request = { cookies: {} } as Request;
 

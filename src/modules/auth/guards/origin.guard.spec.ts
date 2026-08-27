@@ -22,12 +22,18 @@ function createGuard(nodeEnvironment: string): OriginGuard {
 }
 
 describe('OriginGuard', () => {
+  // ---------------------------------------------
+  // Flexibilidade no ambiente de desenvolvimento
+  // ---------------------------------------------
   it('não bloqueia ferramentas REST no desenvolvimento', () => {
     expect(createGuard('development').canActivate(contextWithOrigin())).toBe(
       true,
     );
   });
 
+  // ---------------------------------------------
+  // Validação estrita da origem em produção
+  // ---------------------------------------------
   it('aceita somente a origem exata configurada em produção', () => {
     const guard = createGuard('production');
 

@@ -23,7 +23,10 @@ describe('ResendEmailService', () => {
     service = new ResendEmailService(client, config);
   });
 
-  it('envia verificação com fragmento e idempotency key', async () => {
+  // ---------------------------------------------
+  // Envio de emails de autenticação
+  // ---------------------------------------------
+  it('envia verificação com fragmento e chave de idempotência', async () => {
     await service.sendEmailVerification({
       recipient: 'usuario@example.com',
       rawToken: 'token-seguro',

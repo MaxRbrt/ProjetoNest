@@ -48,15 +48,15 @@ export class OrdersService {
       let total = 0;
       const items: OrderItem[] = [];
 
-      // Ordenado por productId: duas transações concorrentes sempre pedem locks
-      // na mesma ordem, evitando deadlock quando um pedido tem múltiplos itens.
+      // Ordenado por productId: duas transações concorrentes sempre pedem os
+      // bloqueios na mesma ordem, evitando impasse quando há múltiplos itens.
       const sortedItems = [...dto.items].sort(
         (a, b) => a.productId - b.productId,
       );
 
       for (const item of sortedItems) {
-        // O lock pessimista impede que dois pedidos aprovem simultaneamente o
-        // mesmo saldo antes de efetuar a baixa.
+        // O bloqueio pessimista impede que dois pedidos aprovem simultaneamente
+        // o mesmo saldo antes de efetuar a baixa.
         const product = await manager.findOne(Product, {
           where: { id: item.productId },
           lock: { mode: 'pessimistic_write' },
