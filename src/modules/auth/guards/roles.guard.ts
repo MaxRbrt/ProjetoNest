@@ -15,9 +15,9 @@ export class RolesGuard implements CanActivate {
 
   // ---------------------------------------------
   // Verificação do papel exigido
-  // ---------------------------------------------
   // Executado depois do guard de autenticação, portanto a requisição já
   // contém user nas rotas protegidas. Sem @Roles(), nenhum papel é exigido.
+  // ---------------------------------------------
   canActivate(context: ExecutionContext): boolean {
     const required = this.reflector.getAllAndOverride<Role[] | undefined>(
       ROLES_KEY,

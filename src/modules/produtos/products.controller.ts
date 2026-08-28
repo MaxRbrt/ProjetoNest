@@ -18,8 +18,8 @@ import { Role } from '../usuarios/entities/user.entity';
 
 // ---------------------------------------------
 // Catálogo de produtos
-// ---------------------------------------------
 // Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
+// ---------------------------------------------
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

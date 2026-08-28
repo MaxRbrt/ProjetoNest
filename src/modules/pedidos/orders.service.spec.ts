@@ -1,11 +1,15 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Role } from '../usuarios/entities/user.entity';
 import { PublicUser } from '../usuarios/users.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './entities/order.entity';
 import { Product } from '../produtos/entities/product.entity';
-import { OrdersService } from './orders.service';
+import { hashOrderPayload, OrdersService } from './orders.service';
 
 describe('Serviço de pedidos', () => {
   const cliente: PublicUser = {
@@ -128,6 +132,169 @@ describe('Serviço de pedidos', () => {
       total: 30,
       items: [expect.objectContaining({ productId: 10, quantity: 2 })],
       userId: cliente.id,
+      idempotencyKey: null,
+      payloadHash: null,
     });
+  });
+
+  // ---------------------------------------------
+  // Idempotência de criação (Idempotency-Key)
+  // ---------------------------------------------
+  const dto: CreateOrderDto = { items: [{ productId: 10, quantity: 2 }] };
+
+  function mockCreateFlow() {
+    const product = Object.assign(new Product(), {
+      id: 10,
+      name: 'Produto',
+      price: 15,
+      stock: 5,
+    });
+    const order = Object.assign(new Order(), { id: 1 });
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(product),
+      save: jest.fn().mockImplementation((entity: unknown) => entity),
+      create: jest.fn().mockReturnValue(order),
+    };
+    repository.manager.transaction.mockImplementation(
+      (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+    return { manager, order };
+  }
+
+  it('grava idempotencyKey e o hash do payload quando o cabeçalho é enviado', async () => {
+    repository.findOne.mockResolvedValue(null);
+    const { manager } = mockCreateFlow();
+
+    await service.create(dto, cliente, 'chave-abc');
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { userId: cliente.id, idempotencyKey: 'chave-abc' },
+      relations: { items: true },
+    });
+    expect(manager.create).toHaveBeenCalledWith(Order, {
+      total: 30,
+      items: [expect.objectContaining({ productId: 10, quantity: 2 })],
+      userId: cliente.id,
+      idempotencyKey: 'chave-abc',
+      payloadHash: hashOrderPayload(dto.items),
+    });
+  });
+
+  it('devolve o pedido existente em vez de criar outro quando a chave repete o mesmo payload', async () => {
+    const existing = Object.assign(new Order(), {
+      id: 9,
+      idempotencyKey: 'chave-abc',
+      payloadHash: hashOrderPayload(dto.items),
+    });
+    repository.findOne.mockResolvedValue(existing);
+
+    const result = await service.create(dto, cliente, 'chave-abc');
+
+    expect(result).toBe(existing);
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
+  });
+
+  it('recusa com 409 quando a mesma chave é usada com um payload diferente', async () => {
+    const existing = Object.assign(new Order(), {
+      id: 9,
+      idempotencyKey: 'chave-abc',
+      payloadHash: 'hash-de-outro-pedido',
+    });
+    repository.findOne.mockResolvedValue(existing);
+
+    await expect(
+      service.create(dto, cliente, 'chave-abc'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
+  });
+
+  it('resolve corrida de duas requisições concorrentes devolvendo o pedido do vencedor', async () => {
+    // Nenhum pedido existente na primeira consulta: as duas requisições
+    // concorrentes chegam aqui em paralelo. Só uma vence a restrição de
+    // unicidade (userId, idempotencyKey) no insert; a outra recebe o erro
+    // do Postgres e busca de novo para devolver o pedido que já foi salvo.
+    const winner = Object.assign(new Order(), {
+      id: 9,
+      idempotencyKey: 'chave-abc',
+      payloadHash: hashOrderPayload(dto.items),
+    });
+    repository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winner);
+    const product = Object.assign(new Product(), {
+      id: 10,
+      name: 'Produto',
+      price: 15,
+      stock: 5,
+    });
+    const uniqueViolation = Object.assign(new Error('duplicate key'), {
+      code: '23505',
+    });
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(product),
+      // A baixa de estoque (save do Product) sucede normalmente; só o
+      // insert do Order colide com o índice único — é isso que a corrida
+      // real do Postgres faria, não uma falha genérica em qualquer save.
+      save: jest
+        .fn()
+        .mockImplementation((entity: unknown) =>
+          entity instanceof Order
+            ? Promise.reject(uniqueViolation)
+            : Promise.resolve(entity),
+        ),
+      create: jest.fn().mockReturnValue(new Order()),
+    };
+    repository.manager.transaction.mockImplementation(
+      async (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+
+    const result = await service.create(dto, cliente, 'chave-abc');
+
+    expect(result).toBe(winner);
+    expect(repository.findOne).toHaveBeenCalledTimes(2);
+  });
+
+  it('sem Idempotency-Key, cria normalmente sem consultar nem gravar chave', async () => {
+    const { manager } = mockCreateFlow();
+
+    await service.create(dto, cliente);
+
+    expect(repository.findOne).not.toHaveBeenCalled();
+    expect(manager.create).toHaveBeenCalledWith(
+      Order,
+      expect.objectContaining({ idempotencyKey: null, payloadHash: null }),
+    );
+  });
+
+  it('recusa Idempotency-Key vazia (só espaços) com 400 antes de qualquer consulta', async () => {
+    await expect(service.create(dto, cliente, '   ')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repository.findOne).not.toHaveBeenCalled();
+  });
+
+  it('recusa Idempotency-Key maior que 128 caracteres com 400 antes de qualquer consulta', async () => {
+    const chaveLonga = 'a'.repeat(129);
+
+    await expect(
+      service.create(dto, cliente, chaveLonga),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.findOne).not.toHaveBeenCalled();
+  });
+
+  it('recusa pedido com o mesmo produto repetido no carrinho', async () => {
+    const dtoDuplicado: CreateOrderDto = {
+      items: [
+        { productId: 10, quantity: 1 },
+        { productId: 10, quantity: 2 },
+      ],
+    };
+
+    await expect(service.create(dtoDuplicado, cliente)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
   });
 });

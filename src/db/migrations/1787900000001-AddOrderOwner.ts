@@ -5,9 +5,9 @@ export class AddOrderOwner1787900000001 implements MigrationInterface {
 
   // ---------------------------------------------
   // Vinculação do pedido ao usuário dono
-  // ---------------------------------------------
   // Os pedidos existentes são dados de teste sem dono. Como userId é NOT NULL,
   // precisam sair antes da coluna entrar. Itens primeiro, por causa da FK.
+  // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DELETE FROM "order_items"`);
     await queryRunner.query(`DELETE FROM "orders"`);
@@ -23,9 +23,9 @@ export class AddOrderOwner1787900000001 implements MigrationInterface {
 
   // ---------------------------------------------
   // Remoção do vínculo entre pedido e usuário dono
-  // ---------------------------------------------
   // FK, índice e coluna saem em ordem inversa à criação para não deixar
   // dependência apontando para um objeto já removido.
+  // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TABLE "orders" DROP CONSTRAINT "FK_orders_user"`,

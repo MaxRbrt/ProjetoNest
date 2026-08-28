@@ -133,6 +133,7 @@ export class AuthService {
             lockedUntil: true,
             createdAt: true,
             updatedAt: true,
+            role: true,
           },
           lock: { mode: 'pessimistic_write' },
         });

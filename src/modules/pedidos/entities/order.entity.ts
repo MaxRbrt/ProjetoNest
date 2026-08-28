@@ -27,8 +27,8 @@ export class Order {
 
   // ---------------------------------------------
   // Dono do pedido
-  // ---------------------------------------------
   // Índice obrigatório: toda listagem de pedido de cliente filtra por userId.
+  // ---------------------------------------------
   @Index('IDX_orders_user')
   @Column({ type: 'uuid' })
   userId: string;
@@ -36,4 +36,16 @@ export class Order {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  // ---------------------------------------------
+  // Idempotência de criação
+  // null para pedidos criados sem Idempotency-Key (comportamento anterior).
+  // Índice único parcial (userId, idempotencyKey) garante que retry com a
+  // mesma chave nunca gera dois pedidos, mesmo sob concorrência.
+  // ---------------------------------------------
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  idempotencyKey: string | null;
+
+  @Column({ type: 'char', length: 64, nullable: true })
+  payloadHash: string | null;
 }

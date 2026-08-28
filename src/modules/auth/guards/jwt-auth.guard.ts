@@ -12,10 +12,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   // ---------------------------------------------
   // Liberação de rotas públicas
-  // ---------------------------------------------
   // Sem @Public(), a rota exige token. Um controller novo que esqueça a
   // anotação nasce protegido — falha fechada, ao contrário de guard por
   // controller, que deixaria a rota aberta silenciosamente.
+  // ---------------------------------------------
   canActivate(
     context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
