@@ -56,6 +56,7 @@ describe('Serviço de pedidos', () => {
     expect(repository.findAndCount).toHaveBeenCalledWith({
       where: { userId: cliente.id },
       relations: { items: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
       skip: 0,
       take: 20,
     });
@@ -69,6 +70,7 @@ describe('Serviço de pedidos', () => {
     expect(repository.findAndCount).toHaveBeenCalledWith({
       where: {},
       relations: { items: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
       skip: 0,
       take: 20,
     });
@@ -167,6 +169,75 @@ describe('Serviço de pedidos', () => {
       idempotencyKey: null,
       payloadHash: null,
     });
+  });
+
+  // ---------------------------------------------
+  // Registro histórico do item comprado
+  // Nome e preço são copiados para o item no momento da compra. Sem isso o
+  // pedido antigo passaria a exibir o preço atual do produto, e um produto
+  // removido deixaria o item sem identificação nenhuma.
+  // ---------------------------------------------
+  it('congela nome e preço do produto no item do pedido', async () => {
+    const dto: CreateOrderDto = { items: [{ productId: 10, quantity: 2 }] };
+    const product = Object.assign(new Product(), {
+      id: 10,
+      name: 'Caneca Azul',
+      price: 15,
+      stock: 5,
+    });
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(product),
+      save: jest.fn().mockImplementation((entity: unknown) => entity),
+      create: jest.fn().mockReturnValue(new Order()),
+    };
+    repository.manager.transaction.mockImplementation(
+      (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+
+    await service.create(dto, cliente);
+
+    expect(manager.create).toHaveBeenCalledWith(
+      Order,
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            productId: 10,
+            quantity: 2,
+            productName: 'Caneca Azul',
+            unitPrice: 15,
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('mantém o preço registrado mesmo que o produto mude de preço depois', async () => {
+    const dto: CreateOrderDto = { items: [{ productId: 10, quantity: 1 }] };
+    const product = Object.assign(new Product(), {
+      id: 10,
+      name: 'Caneca Azul',
+      price: 15,
+      stock: 5,
+    });
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(product),
+      save: jest.fn().mockImplementation((entity: unknown) => entity),
+      create: jest.fn().mockReturnValue(new Order()),
+    };
+    repository.manager.transaction.mockImplementation(
+      (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+
+    await service.create(dto, cliente);
+    const itemGravado = (
+      manager.create.mock.calls[0][1] as { items: OrderItem[] }
+    ).items[0];
+
+    product.price = 99;
+
+    expect(itemGravado.unitPrice).toBe(15);
   });
 
   // ---------------------------------------------
@@ -396,11 +467,7 @@ describe('Serviço de pedidos', () => {
   it('estorna ao estoque a quantidade exata de cada item ao cancelar', async () => {
     const { produtos } = mockStatusFlow(OrderStatus.PENDENTE);
 
-    await service.updateStatus(
-      5,
-      { status: OrderStatus.CANCELADO },
-      cliente,
-    );
+    await service.updateStatus(5, { status: OrderStatus.CANCELADO }, cliente);
 
     expect(produtos.get(10)!.stock).toBe(3);
     expect(produtos.get(20)!.stock).toBe(7);
@@ -411,11 +478,7 @@ describe('Serviço de pedidos', () => {
     // pediriam os bloqueios em ordens opostas e travariam em deadlock.
     const { manager } = mockStatusFlow(OrderStatus.PENDENTE);
 
-    await service.updateStatus(
-      5,
-      { status: OrderStatus.CANCELADO },
-      cliente,
-    );
+    await service.updateStatus(5, { status: OrderStatus.CANCELADO }, cliente);
 
     const idsTravados = manager.findOne.mock.calls
       .filter((call) => call[0] === Product)
@@ -480,11 +543,7 @@ describe('Serviço de pedidos', () => {
     // PENDENTE e as duas estornariam o estoque.
     const { manager } = mockStatusFlow(OrderStatus.PENDENTE);
 
-    await service.updateStatus(
-      5,
-      { status: OrderStatus.CANCELADO },
-      cliente,
-    );
+    await service.updateStatus(5, { status: OrderStatus.CANCELADO }, cliente);
 
     const chamadaDoPedido = manager.findOne.mock.calls.find(
       (call) => call[0] === Order,

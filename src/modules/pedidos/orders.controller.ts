@@ -9,7 +9,9 @@ import {
   Patch,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { Paginated } from '../../common/dto/paginated';
+import { ApiPaginatedResponse } from '../../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import type { PublicUser } from '../usuarios/users.service';
@@ -18,6 +20,7 @@ import { Order } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
+@ApiBearerAuth('access-token')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -26,6 +29,7 @@ export class OrdersController {
   // Listagem de pedidos
   // ---------------------------------------------
   @Get()
+  @ApiPaginatedResponse(Order)
   findAll(
     @CurrentUser() user: PublicUser,
     @Query() query: PaginationQueryDto,
