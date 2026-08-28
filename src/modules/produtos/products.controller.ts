@@ -10,12 +10,14 @@ import {
   HttpCode,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { Paginated } from '../../common/dto/paginated';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { ApiPaginatedResponse } from '../../common/dto/paginated-response.dto';
 import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { Roles } from '../../decorators/roles.decorator';
 import { Role } from '../usuarios/entities/user.entity';
 
@@ -23,6 +25,7 @@ import { Role } from '../usuarios/entities/user.entity';
 // Catálogo de produtos
 // Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
 // ---------------------------------------------
+@ApiBearerAuth('access-token')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -31,7 +34,8 @@ export class ProductsController {
   // Listagem de produtos
   // ---------------------------------------------
   @Get()
-  findAll(@Query() query: PaginationQueryDto): Promise<Paginated<Product>> {
+  @ApiPaginatedResponse(Product)
+  findAll(@Query() query: FindProductsQueryDto): Promise<Paginated<Product>> {
     return this.productsService.findAll(query);
   }
 

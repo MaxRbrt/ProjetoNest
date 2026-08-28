@@ -25,10 +25,14 @@ export class CategoriesService {
 
   // ---------------------------------------------
   // Listagem paginada de categorias
+  // A ordenação por id é obrigatória, não estética: sem ORDER BY o Postgres
+  // não garante ordem entre consultas, e a mesma categoria poderia aparecer
+  // em duas páginas ou sumir de todas conforme o plano de execução mudasse.
   // ---------------------------------------------
   async findAll(query: PaginationQueryDto): Promise<Paginated<Category>> {
     const { page, limit, skip, take } = resolvePagination(query);
     const [data, total] = await this.categoriesRepository.findAndCount({
+      order: { id: 'ASC' },
       skip,
       take,
     });

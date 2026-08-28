@@ -4,15 +4,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import {
   Paginated,
   resolvePagination,
   toPaginated,
 } from '../../common/dto/paginated';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
+import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CategoriesService } from '../categorias/categories.service';
 import { OrderItem } from '../pedidos/entities/order-item.entity';
@@ -26,11 +26,29 @@ export class ProductsService {
   ) {}
 
   // ---------------------------------------------
-  // Listagem paginada de produtos
+  // Listagem paginada de produtos, com filtro e busca
+  // Os filtros entram no where e não em memória: filtrar depois de paginar
+  // devolveria página incompleta e um total que não corresponde ao resultado.
+  // Nome em branco é tratado como filtro ausente, para que um campo de busca
+  // vazio na vitrine não vire uma busca por espaço. A ordenação por id é
+  // obrigatória: sem ORDER BY o Postgres não garante ordem entre consultas, e
+  // o mesmo produto poderia aparecer em duas páginas ou sumir de todas.
   // ---------------------------------------------
-  async findAll(query: PaginationQueryDto): Promise<Paginated<Product>> {
+  async findAll(query: FindProductsQueryDto): Promise<Paginated<Product>> {
     const { page, limit, skip, take } = resolvePagination(query);
+    const where: FindOptionsWhere<Product> = {};
+
+    if (query.categoryId !== undefined) {
+      where.categoryId = query.categoryId;
+    }
+    const name = query.name?.trim();
+    if (name) {
+      where.name = ILike(`%${name}%`);
+    }
+
     const [data, total] = await this.productsRepository.findAndCount({
+      where,
+      order: { id: 'ASC' },
       skip,
       take,
     });

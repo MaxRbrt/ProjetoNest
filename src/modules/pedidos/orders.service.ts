@@ -130,7 +130,10 @@ export class OrdersService {
   // Listagem paginada de pedidos
   // Administrador enxerga todos; cliente enxerga apenas os próprios. O filtro
   // de dono entra no where, antes de skip/take, para que a paginação recaia
-  // somente sobre os pedidos que o usuário pode ver.
+  // somente sobre os pedidos que o usuário pode ver. A ordenação é obrigatória
+  // e precisa desempatar por id: sem ORDER BY o Postgres não garante ordem
+  // entre consultas, e pedidos criados no mesmo instante embaralhariam entre
+  // páginas mesmo ordenando só por createdAt.
   // ---------------------------------------------
   async findAll(
     user: PublicUser,
@@ -140,6 +143,7 @@ export class OrdersService {
     const [data, total] = await this.ordersRepository.findAndCount({
       where: user.role === Role.ADMIN ? {} : { userId: user.id },
       relations: { items: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
       skip,
       take,
     });
@@ -261,9 +265,7 @@ export class OrdersService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!product) {
-        throw new NotFoundException(
-          `Produto ${item.productId} não encontrado`,
-        );
+        throw new NotFoundException(`Produto ${item.productId} não encontrado`);
       }
       product.stock += item.quantity;
       await manager.save(product);
@@ -335,6 +337,8 @@ export class OrdersService {
         const orderItem = new OrderItem();
         orderItem.productId = item.productId;
         orderItem.quantity = item.quantity;
+        orderItem.productName = product.name;
+        orderItem.unitPrice = product.price;
         items.push(orderItem);
 
         product.stock -= item.quantity;

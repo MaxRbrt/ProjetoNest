@@ -61,4 +61,16 @@ describe('Paginação', () => {
   it('recusa valor não numérico', () => {
     expect(validateQuery({ page: 'abc' })).not.toHaveLength(0);
   });
+
+  it('recusa página absurdamente alta em notação científica', () => {
+    expect(validateQuery({ page: '1e100' })).not.toHaveLength(0);
+  });
+
+  it('recusa página acima do teto de 10000', () => {
+    expect(validateQuery({ page: '10001' })).not.toHaveLength(0);
+  });
+
+  it('aceita a última página dentro do teto', () => {
+    expect(validateQuery({ page: '10000' })).toHaveLength(0);
+  });
 });

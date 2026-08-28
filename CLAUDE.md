@@ -1,71 +1,134 @@
 # CLAUDE.md — projeto-test
 
-Projeto de estudo em NestJS + TypeORM + Postgres (Supabase). Objetivo é aprender os mecanismos por
-dentro (auth manual, autorização, persistência), não usar serviços gerenciados que escondam o
-funcionamento.
+API de catálogo e pedidos em NestJS + TypeORM + Postgres (Supabase). Projeto de estudo: o objetivo é
+aprender os mecanismos por dentro (autenticação manual, autorização, persistência, concorrência), não
+terceirizar para serviços que escondam o funcionamento.
 
-## Protocolo de retomada (ler isto primeiro, antes de reler código)
+> **Este arquivo é o único registro que sobrevive num clone.** O `.gitignore` exclui `docs/` e
+> `/.superpowers`, então specs, planos, ADRs, auditorias e o ledger de execução **não vão para o
+> GitHub** — existem apenas na máquina onde foram escritos. Toda decisão que precisa durar tem que
+> estar aqui. Atualize este arquivo ao fim de cada bloco de trabalho, antes de considerá-lo pronto.
 
-Este projeto é conduzido por planos SDD (`superpowers:subagent-driven-development`). Cada subprojeto
-vive em `.superpowers/sdd/<data>-<slug>/`, com plano em `docs/superpowers/plans/` e spec em
-`docs/superpowers/specs/`.
+## Estado atual
 
-1. Achar o subprojeto mais recente: `.superpowers/sdd/` ordenado por data no nome da pasta.
-2. Ler `progress.md` inteiro daquela pasta — é o ledger, fonte da verdade sobre o que foi feito,
-   revisado e decidido (rulings). **Não parar na última seção com título** — o arquivo pode terminar
-   no meio de uma task se a sessão anterior caiu por limite de contexto. Confirme visualmente que a
-   última linha do arquivo é uma conclusão de task ("Task N: completa...") e não um cabeçalho vazio.
-3. Cruzar com a realidade: para cada `task-N-brief.md` sem `task-N-report.md` correspondente, ou sem
-   entrada no ledger, checar se o código já existe no `src/` mesmo assim. Já aconteceu (Tasks 6-8 do
-   subprojeto `autorizacao-ownership`, 2026-08-28) de uma sessão implementar tudo, aplicar migration
-   real no banco, e cair antes de escrever o relatório e a entrada do ledger. **Não reimplementar por
-   via das dúvidas** — verificar primeiro (`tsc --noEmit`, `npx jest`, ler o diff mental contra o
-   brief), documentar a lacuna encontrada, e seguir para revisão em vez de reescrever.
-4. Se há trabalho implementado sem revisão adversarial registrada no ledger (nem revisor SDD nem
-   Codex), isso é o que falta antes de considerar a task "pronta" — não é preciso refazer
-   implementação.
-5. `git status`/`log`/`diff` **não podem ser usados pela sessão** (regra dura do usuário, reforçada
-   por hook). Nenhuma task deste projeto tem commit feito pela IA — todo estado vive no working tree.
-   Cada task fechada no ledger já vem com a lista de arquivos prontos para commit; o comando de commit
-   é sempre entregue ao usuário, nunca executado.
+Backend com o núcleo completo. Última atualização: 2026-08-28.
 
-## Convenções do projeto
+| Área | Estado |
+|---|---|
+| Autenticação | Completa — cadastro, verificação de email, login, refresh rotativo, logout, recuperação de senha, Argon2, checagem HIBP, throttling, sessões revogáveis, `no-store`, `OriginGuard` |
+| Autorização | Completa — guard global (toda rota nasce protegida), `@Public()`, `@Roles()`, ownership de pedido, promoção a admin fora da API |
+| Catálogo | Produtos e categorias com CRUD completo, listagem paginada, filtro por categoria e busca por nome |
+| Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento |
+| Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
+| Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
+| Testes | 24 suítes / 138 testes unitários. **Sem E2E** — ver dívidas |
 
-- Comentários, mensagens de erro/log e documentação: **PT-BR**. Identificadores de código
-  (variáveis, funções, classes): **inglês**. Comentários agrupados por bloco funcional
-  (`// ----` + título), inclusive em migrations triviais — ver qualquer migration em
-  `src/db/migrations/` como referência de formato.
-- Nomes de pasta de módulo estão **mistos de propósito**: `src/modules/auth/` e
-  `src/modules/email/` em inglês (não tocar); `src/modules/usuarios/`, `produtos/`, `categorias/`,
-  `pedidos/` em português (renomeados fora do fluxo SDD em 2026-08-27, aceito como está — ver ledger
-  do subprojeto `autorizacao-ownership`). Nomes de **arquivo** dentro dessas pastas continuam em
-  inglês (`orders.service.ts` dentro de `pedidos/`). Não normalizar sem pedido explícito do usuário.
-- Commits em lotes de ~3 arquivos, um comando de commit por task fechada no ledger — nunca em lote
-  gigante no fim.
-- Revisão adversarial (Codex, `cc-skill-codex:codex`) acontece **uma vez no fechamento do
-  subprojeto inteiro**, não por task individual — ruling já registrado no ledger da Task 4 de
-  `autorizacao-ownership`. Rodar por task é desperdício; rodar zero vezes deixa mudança de auth sem
-  segunda opinião.
+## Decisões que não são óbvias no código
 
-## Quirks de ambiente (Windows, evitar redescobrir)
+- **JWT manual em vez de Supabase Auth** — o objetivo é aprender o mecanismo de sessão por dentro.
+- **Pedido alheio devolve 404, não 403.** Um 403 confirmaria que o pedido existe e, com ids
+  sequenciais, permitiria enumerar o volume de pedidos de terceiros. Vale para `GET /orders/:id` e
+  para `PATCH /orders/:id/status`.
+- **O papel do usuário nunca vem da requisição.** `RegisterDto` não declara `role` e o
+  `ValidationPipe` global usa `forbidNonWhitelisted`. Promover alguém só via
+  `npm run seed:admin -- <email> --confirm-target=<user>@<host>:<port>/<database>`, que exige
+  confirmação exata do banco alvo antes de abrir conexão — host e database sozinhos não bastam,
+  porque o pooler do Supabase compartilha host entre projetos distintos.
+- **Estados de logística ficaram fora do enum de pedido.** Sem endereço nem frete no sistema,
+  `ENVIADO`/`ENTREGUE` seriam campo decorativo. Transições válidas: `PENDENTE→PAGO` (só ADMIN),
+  `PENDENTE→CANCELADO` (dono ou ADMIN), `PAGO→CANCELADO` (só ADMIN). `CANCELADO` é terminal.
+- **`OrderItem` congela `productName` e `unitPrice` na compra.** Sem isso o pedido antigo exibiria o
+  preço atual do produto, não o preço pago, e um produto removido deixaria o item sem identificação.
+- **Toda listagem tem `ORDER BY` explícito.** Não é estética: sem ele o Postgres não garante ordem
+  entre consultas e o mesmo registro pode aparecer em duas páginas ou sumir de todas.
+- **`page` e `limit` têm teto** (10.000 e 100). Sem teto em `page`, `1e100` passa no `@IsInt` e vira
+  um `OFFSET` impraticável que responde erro interno em vez de 400.
+- **Locks são pedidos em ordem crescente de `productId`**, tanto na criação quanto no estorno do
+  cancelamento. Ordens opostas travariam em deadlock quando as duas operações rodam em paralelo.
 
-- `npx ts-node -e "import('./src/db/data-source')..."` falha aqui com
-  `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` (import dinâmico + `-e` no Node do Windows). Alternativa:
-  escrever um script `.ts` temporário equivalente na raiz, rodar com `npx ts-node arquivo.ts`, apagar
-  em seguida.
-- O wrapper `codex-ask.sh` da skill `cc-skill-codex:codex` falha aqui (`python3` no PATH é o stub do
-  Windows Store, não um Python real). Usar o fallback inline da própria skill (`codex exec` direto via
-  heredoc, sem o wrapper) — está documentado no apêndice da skill.
-- Processo `node dist/main` obsoleto pode ficar preso na porta 3000 entre sessões — verificar antes de
-  testar rota manualmente (já mascarou teste uma vez, ver ledger da Task 3 de `autorizacao-ownership`).
+## Dívidas conhecidas (decisões conscientes, não esquecimento)
 
-## Mapa de documentação
+1. **Sem testes E2E.** Falta `TEST_DATABASE_URL` — um banco isolado. O único e2e existente
+   (`test/app.e2e-spec.ts`) fica em `describe.skip` sem essa variável. Consequência: os testes de
+   lock usam mocks, então **não há prova de concorrência contra Postgres real**. É a dívida mais
+   relevante da lista.
+2. **Dinheiro em ponto flutuante.** `Product.price`, `Order.total` e `OrderItem.unitPrice` usam
+   `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
+   quebraria todo cálculo de total, comparação de estoque e testes. Merece subprojeto próprio.
+3. **TOCTOU nas checagens de dependência.** Em `products.service` e `categories.service`, `count` e
+   `remove` não são atômicos. A FK protege o dado, mas o erro `23503` viraria 500 em vez de 409.
+4. **Sem carrinho, pagamento, endereço, frete, cupom ou avaliação** — fora de escopo por decisão.
 
-- `docs/decisions/` — ADRs (decisões arquiteturais de longo prazo, ex.: por que JWT manual em vez de
-  Supabase Auth).
-- `docs/superpowers/specs/` — spec de cada subprojeto (desenho técnico revisado antes da implementação).
-- `docs/superpowers/plans/` — plano de tasks de cada subprojeto.
-- `.superpowers/sdd/<slug>/` — execução: briefs, reports e `progress.md` (ledger). **Este é o
-  arquivo com maior densidade de contexto por token lido — sempre começar por ele.**
-- `docs/auditorias/` — achados de auditoria de segurança consolidados por subprojeto.
-- `docs/prompts/comentarios-ptbr.md` — regra de idioma em detalhe, se este resumo não bastar.
+## Convenções
+
+- **Idioma:** comentários, mensagens de erro/log, documentação e nomes de teste em **PT-BR**;
+  identificadores de código (variáveis, funções, classes) em **inglês**.
+- **Comentário de bloco:** título e explicação ficam os dois **dentro** da caixa, e a explicação
+  nunca fica solta depois do fechamento:
+
+  ```ts
+  // ---------------------------------------------
+  // Listagem de pedidos
+  // Administrador enxerga todos; cliente enxerga apenas os próprios.
+  // ---------------------------------------------
+  findAll(user: PublicUser) { ... }
+  ```
+
+  Bloco só com título também vale, quando a seção se explica. **Nada de comentário solto no meio do
+  corpo da função** — a explicação inteira vai uma vez só no bloco do topo, e o corpo roda limpo.
+- **Nomes de pasta são mistos de propósito:** `src/modules/auth/` e `src/modules/email/` em inglês;
+  `usuarios/`, `produtos/`, `categorias/`, `pedidos/` em português. Nomes de **arquivo** continuam em
+  inglês (`orders.service.ts` dentro de `pedidos/`). Não normalizar sem pedido explícito.
+- **TDD:** teste que falha primeiro, depois implementação.
+- **Commits em lotes de ~3 arquivos**, com o comando entregue ao usuário — nunca um lote gigante.
+- **Revisão adversarial (Codex)** uma vez no fechamento de cada bloco de trabalho, não por tarefa
+  individual. Rodar por tarefa é desperdício; rodar zero vezes deixa mudança de auth sem segunda
+  opinião. Nas quatro vezes que rodou neste projeto, achou problema real — inclusive de severidade
+  alta. **Não declarar trabalho pronto antes de a revisão responder.**
+
+## Regras duras da sessão
+
+- **Nenhum comando `git` ou `gh` pode ser executado pela sessão**, nem de leitura (`status`, `log`,
+  `diff`). Reforçado por hook. Consequência prática: o estado vive no working tree e o assistente
+  entrega os comandos de commit prontos para o usuário executar.
+- **Migrations destrutivas exigem confirmação explícita do proprietário** antes de rodar.
+
+## Quirks de ambiente (Windows — evitar redescobrir)
+
+- `npx ts-node -e "import('./src/db/data-source')..."` falha com
+  `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`. Alternativa: escrever um script `.ts` temporário na raiz,
+  rodar com `npx ts-node arquivo.ts` e apagar em seguida.
+- O wrapper `codex-ask.sh` da skill `cc-skill-codex:codex` falha aqui — `python3` no PATH é o stub da
+  Windows Store, não um Python real. Usar o fallback inline da skill (`codex exec` direto via
+  heredoc).
+- Processo `node dist/main` obsoleto pode ficar preso na porta 3000 entre sessões. Conferir com
+  `netstat -ano | grep :3000` antes de testar rota manualmente — já mascarou teste uma vez.
+- `@nestjs/swagger` está fixado na major **11**: a 12 exige NestJS 12 e o projeto usa NestJS 11.
+  Não resolver esse conflito com `--legacy-peer-deps`.
+- O `/tmp` do bash e o `/tmp` do Node divergem no Windows. Usar caminho absoluto ao passar arquivo
+  entre um e outro.
+
+## Comandos
+
+| Comando | Para quê |
+|---|---|
+| `npm run start` / `start:dev` | Sobe a API (porta 3000) |
+| `npx jest` | Testes unitários |
+| `npx tsc -p tsconfig.build.json --noEmit` | Checagem de tipos (o `tsc` sem esse config acusa erros pré-existentes nos specs) |
+| `npm run format` | Prettier |
+| `npm run migration:run` / `migration:revert` | Migrations |
+| `npm run seed:admin -- <email> --confirm-target=...` | Promove usuário a ADMIN |
+
+## Documentação local (não versionada)
+
+Existe apenas na máquina de origem — se este repositório for clonado, nada disto vem junto:
+
+- `docs/decisions/` — ADRs.
+- `docs/superpowers/specs/` e `docs/superpowers/plans/` — desenho e plano de cada bloco de trabalho.
+- `.superpowers/sdd/<slug>/progress.md` — ledger de execução, com os rulings tomados no caminho.
+- `docs/auditorias/` — achados de auditoria de segurança.
+
+Ao retomar em uma máquina que tenha esses arquivos, o `progress.md` mais recente é o de maior
+densidade de contexto — comece por ele, e leia **até o fim**: uma sessão interrompida pode deixá-lo
+cortado no meio de uma tarefa cujo código já foi escrito. Antes de reimplementar qualquer coisa,
+verifique se ela já existe em `src/`.
