@@ -10,7 +10,9 @@ import {
   Query,
   Delete,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { Paginated } from '../../common/dto/paginated';
+import { ApiPaginatedResponse } from '../../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
@@ -23,6 +25,7 @@ import { Role } from '../usuarios/entities/user.entity';
 // Catálogo de categorias
 // Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
 // ---------------------------------------------
+@ApiBearerAuth('access-token')
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
@@ -31,9 +34,8 @@ export class CategoriesController {
   // Listagem de categorias
   // ---------------------------------------------
   @Get()
-  findAll(
-    @Query() query: PaginationQueryDto,
-  ): Promise<Paginated<Category>> {
+  @ApiPaginatedResponse(Category)
+  findAll(@Query() query: PaginationQueryDto): Promise<Paginated<Category>> {
     return this.categoriesService.findAll(query);
   }
 
