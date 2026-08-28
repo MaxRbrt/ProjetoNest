@@ -11,7 +11,6 @@ import { AuthService } from './auth.service';
 import { AuthActionToken } from './entities/auth-action-token.entity';
 import { AuthSession } from './entities/auth-session.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OriginGuard } from './guards/origin.guard';
 import { NoStoreInterceptor } from './interceptors/no-store.interceptor';
 import { AccessTokenService } from './services/access-token.service';
@@ -74,10 +73,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RefreshCookieService,
     SessionsService,
     JwtStrategy,
-    JwtAuthGuard,
     OriginGuard,
     NoStoreInterceptor,
   ],
-  exports: [JwtAuthGuard],
 })
 export class AuthModule {}

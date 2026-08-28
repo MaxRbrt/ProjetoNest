@@ -17,6 +17,8 @@ export class RolesGuard implements CanActivate {
   // Verificação do papel exigido
   // Executado depois do guard de autenticação, portanto a requisição já
   // contém user nas rotas protegidas. Sem @Roles(), nenhum papel é exigido.
+  // A mensagem lista os papéis que @Roles() pediu, em vez de citar ADMIN
+  // fixo: assim continua correta quando um papel novo entrar no enum.
   // ---------------------------------------------
   canActivate(context: ExecutionContext): boolean {
     const required = this.reflector.getAllAndOverride<Role[] | undefined>(
@@ -29,7 +31,7 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<{ user?: PublicUser }>();
     if (!request.user || !required.includes(request.user.role)) {
-      throw new ForbiddenException('Acesso restrito a administradores.');
+      throw new ForbiddenException(`Acesso restrito a ${required.join(', ')}.`);
     }
     return true;
   }

@@ -12,10 +12,14 @@ describe('UsersService', () => {
   // Exposição segura dos dados do usuário
   // ---------------------------------------------
   it('expõe somente os campos públicos do usuário', () => {
+    // O fixture precisa declarar role: sem ele, toPublicUser devolveria
+    // role undefined e o toEqual abaixo passaria mesmo assim, deixando de
+    // travar a forma real do PublicUser.
     const user = Object.assign(new User(), {
       id: 'f2fa55e8-9bb4-4d42-8545-1ecae77bc327',
       email: 'usuario@example.com',
       passwordHash: 'hash-que-nao-pode-vazar',
+      role: Role.CLIENTE,
       emailVerifiedAt: new Date('2026-08-26T12:00:00.000Z'),
       failedLoginAttempts: 0,
       lockedUntil: null,
@@ -28,6 +32,7 @@ describe('UsersService', () => {
       email: user.email,
       isEmailVerified: true,
       createdAt: user.createdAt,
+      role: Role.CLIENTE,
     });
     expect(service.toPublicUser(user)).not.toHaveProperty('passwordHash');
   });
