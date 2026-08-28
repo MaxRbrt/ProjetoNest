@@ -219,6 +219,14 @@ describe('AuthService', () => {
     expect(user.failedLoginAttempts).toBe(0);
     expect(user.lockedUntil).toBeNull();
     expect(sessions.createWithManager).toHaveBeenCalledWith(manager, user, now);
+    // Sem `role` no select, toPublicUser() monta a resposta do login com
+    // role undefined mesmo o usuário tendo papel definido no banco.
+    expect(manager.findOne).toHaveBeenCalledWith(
+      User,
+      expect.objectContaining({
+        select: expect.objectContaining({ role: true }),
+      }),
+    );
   });
 
   it('recusa login não verificado com o mesmo erro genérico de senha inválida', async () => {

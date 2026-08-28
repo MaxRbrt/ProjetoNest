@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Headers,
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -37,12 +38,14 @@ export class OrdersController {
 
   // ---------------------------------------------
   // Criação de pedido com baixa de estoque
+  // Idempotency-Key é opcional: sem ela, cada chamada cria um pedido normal.
   // ---------------------------------------------
   @Post()
   create(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: PublicUser,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<Order> {
-    return this.ordersService.create(dto, user);
+    return this.ordersService.create(dto, user, idempotencyKey);
   }
 }

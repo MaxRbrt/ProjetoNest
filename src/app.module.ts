@@ -41,22 +41,21 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     AppService,
     // ---------------------------------------------
     // Guards globais
-    // ---------------------------------------------
     // A ordem importa: autenticação roda antes do throttling, então uma
-    // requisição sem token nunca chega a consumir cota de rate limit.
-    // Toda rota nasce protegida; @Public() é a única exceção explícita.
+    // requisição sem token nunca chega a consumir cota de rate limit. Toda
+    // rota nasce protegida; @Public() é a única exceção explícita. RolesGuard
+    // depende de request.user já preenchido pelo JwtAuthGuard, por isso vem
+    // logo depois dele. ThrottlerGuard define o limite padrão global; rotas
+    // sensíveis podem sobrescrever com políticas mais restritivas.
+    // ---------------------------------------------
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // RolesGuard depende de request.user já preenchido pelo JwtAuthGuard acima,
-    // por isso precisa ser registrado logo em seguida, antes do throttling.
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
-    // O guard global define o limite padrão; rotas sensíveis podem sobrescrever
-    // esse valor com políticas mais restritivas.
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

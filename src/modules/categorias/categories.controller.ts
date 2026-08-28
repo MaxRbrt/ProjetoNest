@@ -16,8 +16,8 @@ import { Role } from '../usuarios/entities/user.entity';
 
 // ---------------------------------------------
 // Catálogo de categorias
-// ---------------------------------------------
 // Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
+// ---------------------------------------------
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
