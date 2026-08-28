@@ -47,4 +47,31 @@ describe('RolesGuard', () => {
       ForbiddenException,
     );
   });
+
+  // ---------------------------------------------
+  // Mensagem derivada dos papéis exigidos
+  // A mensagem não pode citar ADMIN fixo: precisa acompanhar o que @Roles()
+  // pediu, senão passa a mentir quando um papel novo entrar no enum.
+  // ---------------------------------------------
+  it('cita na mensagem os papéis que a rota exige', () => {
+    const guard = new RolesGuard(reflectorCom([Role.ADMIN]));
+    expect(() => guard.canActivate(contextComUsuario(Role.CLIENTE))).toThrow(
+      'Acesso restrito a ADMIN.',
+    );
+  });
+
+  it('lista todos os papéis quando a rota aceita mais de um', () => {
+    const guard = new RolesGuard(reflectorCom([Role.ADMIN, Role.CLIENTE]));
+    const semPapelAceito = {
+      getHandler: () => () => undefined,
+      getClass: () => class {},
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { role: 'OUTRO' } }),
+      }),
+    } as unknown as ExecutionContext;
+
+    expect(() => guard.canActivate(semPapelAceito)).toThrow(
+      'Acesso restrito a ADMIN, CLIENTE.',
+    );
+  });
 });
