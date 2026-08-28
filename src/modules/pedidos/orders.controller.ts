@@ -6,12 +6,17 @@ import {
   Headers,
   Param,
   ParseIntPipe,
+  Patch,
+  Query,
 } from '@nestjs/common';
+import { Paginated } from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import type { PublicUser } from '../usuarios/users.service';
 import { OrdersService } from './orders.service';
 import { Order } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -21,8 +26,11 @@ export class OrdersController {
   // Listagem de pedidos
   // ---------------------------------------------
   @Get()
-  findAll(@CurrentUser() user: PublicUser): Promise<Order[]> {
-    return this.ordersService.findAll(user);
+  findAll(
+    @CurrentUser() user: PublicUser,
+    @Query() query: PaginationQueryDto,
+  ): Promise<Paginated<Order>> {
+    return this.ordersService.findAll(user, query);
   }
 
   // ---------------------------------------------
@@ -47,5 +55,20 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<Order> {
     return this.ordersService.create(dto, user, idempotencyKey);
+  }
+
+  // ---------------------------------------------
+  // Mudança de situação do pedido
+  // Cliente cancela o próprio pedido pendente; confirmar pagamento e cancelar
+  // pedido já pago exigem administrador. As duas regras vivem no serviço, que
+  // decide junto com o status atual lido sob lock.
+  // ---------------------------------------------
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: PublicUser,
+  ): Promise<Order> {
+    return this.ordersService.updateStatus(id, dto, user);
   }
 }
