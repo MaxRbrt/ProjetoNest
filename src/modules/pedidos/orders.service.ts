@@ -1,18 +1,26 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
-import { Repository } from 'typeorm';
-import { Order } from './entities/order.entity';
+import { EntityManager, Repository } from 'typeorm';
+import {
+  Paginated,
+  resolvePagination,
+  toPaginated,
+} from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../produtos/entities/product.entity';
 import { Role } from '../usuarios/entities/user.entity';
 import { PublicUser } from '../usuarios/users.service';
 import { CreateOrderDto, CreateOrderItemDto } from './dto/create-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 // ---------------------------------------------
 // Hash do payload para conferência de Idempotency-Key
@@ -25,6 +33,43 @@ export function hashOrderPayload(items: CreateOrderItemDto[]): string {
     .map((item) => `${item.productId}:${item.quantity}`)
     .join(',');
   return createHash('sha256').update(normalized, 'utf8').digest('hex');
+}
+
+// ---------------------------------------------
+// Transições permitidas do pedido
+// CANCELADO não aparece como origem por ser terminal, e repetir o status
+// atual também é recusado — quem chega aqui esperando mudar algo precisa
+// saber que nada mudou. ADMIN é exigido para confirmar pagamento e para
+// cancelar pedido já pago, que envolveria estorno financeiro.
+// ---------------------------------------------
+const ALLOWED_TRANSITIONS: ReadonlyArray<{
+  from: OrderStatus;
+  to: OrderStatus;
+  adminOnly: boolean;
+}> = [
+  { from: OrderStatus.PENDENTE, to: OrderStatus.PAGO, adminOnly: true },
+  { from: OrderStatus.PENDENTE, to: OrderStatus.CANCELADO, adminOnly: false },
+  { from: OrderStatus.PAGO, to: OrderStatus.CANCELADO, adminOnly: true },
+];
+
+function assertTransitionAllowed(
+  from: OrderStatus,
+  to: OrderStatus,
+  user: PublicUser,
+): void {
+  const transition = ALLOWED_TRANSITIONS.find(
+    (candidate) => candidate.from === from && candidate.to === to,
+  );
+  if (!transition) {
+    throw new ConflictException(
+      `Não é possível mudar o pedido de ${from} para ${to}.`,
+    );
+  }
+  if (transition.adminOnly && user.role !== Role.ADMIN) {
+    throw new ForbiddenException(
+      `Somente administrador pode mudar o pedido de ${from} para ${to}.`,
+    );
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -82,14 +127,23 @@ export class OrdersService {
   ) {}
 
   // ---------------------------------------------
-  // Listagem de pedidos
-  // Administrador enxerga todos; cliente enxerga apenas os próprios.
+  // Listagem paginada de pedidos
+  // Administrador enxerga todos; cliente enxerga apenas os próprios. O filtro
+  // de dono entra no where, antes de skip/take, para que a paginação recaia
+  // somente sobre os pedidos que o usuário pode ver.
   // ---------------------------------------------
-  findAll(user: PublicUser): Promise<Order[]> {
-    return this.ordersRepository.find({
+  async findAll(
+    user: PublicUser,
+    query: PaginationQueryDto,
+  ): Promise<Paginated<Order>> {
+    const { page, limit, skip, take } = resolvePagination(query);
+    const [data, total] = await this.ordersRepository.findAndCount({
       where: user.role === Role.ADMIN ? {} : { userId: user.id },
       relations: { items: true },
+      skip,
+      take,
     });
+    return toPaginated(data, total, page, limit);
   }
 
   // ---------------------------------------------
@@ -151,6 +205,68 @@ export class OrdersService {
         }
       }
       throw error;
+    }
+  }
+
+  // ---------------------------------------------
+  // Mudança de situação do pedido
+  // Tudo roda em uma transação: o pedido é relido com lock de escrita para
+  // que duas requisições concorrentes não decidam sobre o mesmo status e
+  // estornem o estoque duas vezes. O filtro de dono entra na releitura, então
+  // pedido alheio some e vira 404, sem revelar que existe. O estorno trava os
+  // produtos em ordem crescente de productId, a mesma ordem usada na criação,
+  // para que cancelar e criar em paralelo não se travem em deadlock.
+  // ---------------------------------------------
+  updateStatus(
+    id: number,
+    dto: UpdateOrderStatusDto,
+    user: PublicUser,
+  ): Promise<Order> {
+    return this.ordersRepository.manager.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: user.role === Role.ADMIN ? { id } : { id, userId: user.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) {
+        throw new NotFoundException(`Pedido ${id} não encontrado`);
+      }
+
+      assertTransitionAllowed(order.status, dto.status, user);
+
+      if (dto.status === OrderStatus.CANCELADO) {
+        await this.restoreStock(manager, id);
+      }
+
+      order.status = dto.status;
+      return manager.save(order);
+    });
+  }
+
+  // ---------------------------------------------
+  // Devolução do estoque de um pedido cancelado
+  // Os itens são lidos fora do findOne do pedido de propósito: carregar a
+  // relação junto com o lock viraria um outer join, que o Postgres recusa
+  // travar. Cada produto é travado antes de somar a quantidade de volta.
+  // ---------------------------------------------
+  private async restoreStock(
+    manager: EntityManager,
+    orderId: number,
+  ): Promise<void> {
+    const items = await manager.findBy(OrderItem, { orderId });
+    const sortedItems = [...items].sort((a, b) => a.productId - b.productId);
+
+    for (const item of sortedItems) {
+      const product = await manager.findOne(Product, {
+        where: { id: item.productId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!product) {
+        throw new NotFoundException(
+          `Produto ${item.productId} não encontrado`,
+        );
+      }
+      product.stock += item.quantity;
+      await manager.save(product);
     }
   }
 

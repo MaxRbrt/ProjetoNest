@@ -1,13 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Role } from '../usuarios/entities/user.entity';
 import { PublicUser } from '../usuarios/users.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { Order } from './entities/order.entity';
+import { Order, OrderStatus } from './entities/order.entity';
+import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../produtos/entities/product.entity';
 import { hashOrderPayload, OrdersService } from './orders.service';
 
@@ -27,6 +29,7 @@ describe('Serviço de pedidos', () => {
 
   let repository: {
     find: jest.Mock;
+    findAndCount: jest.Mock;
     findOne: jest.Mock;
     manager: { transaction: jest.Mock };
   };
@@ -35,6 +38,7 @@ describe('Serviço de pedidos', () => {
   beforeEach(() => {
     repository = {
       find: jest.fn(),
+      findAndCount: jest.fn(),
       findOne: jest.fn(),
       manager: { transaction: jest.fn() },
     };
@@ -45,25 +49,53 @@ describe('Serviço de pedidos', () => {
   // Listagem conforme o papel do usuário
   // ---------------------------------------------
   it('lista apenas os pedidos do próprio cliente', async () => {
-    repository.find.mockResolvedValue([]);
+    repository.findAndCount.mockResolvedValue([[], 0]);
 
-    await service.findAll(cliente);
+    await service.findAll(cliente, {});
 
-    expect(repository.find).toHaveBeenCalledWith({
+    expect(repository.findAndCount).toHaveBeenCalledWith({
       where: { userId: cliente.id },
       relations: { items: true },
+      skip: 0,
+      take: 20,
     });
   });
 
   it('lista todos os pedidos para administrador', async () => {
-    repository.find.mockResolvedValue([]);
+    repository.findAndCount.mockResolvedValue([[], 0]);
 
-    await service.findAll(admin);
+    await service.findAll(admin, {});
 
-    expect(repository.find).toHaveBeenCalledWith({
+    expect(repository.findAndCount).toHaveBeenCalledWith({
       where: {},
       relations: { items: true },
+      skip: 0,
+      take: 20,
     });
+  });
+
+  it('devolve o envelope paginado com total e página pedida', async () => {
+    const pedido = Object.assign(new Order(), { id: 5 });
+    repository.findAndCount.mockResolvedValue([[pedido], 37]);
+
+    const result = await service.findAll(cliente, { page: 2, limit: 10 });
+
+    expect(result).toEqual({ data: [pedido], total: 37, page: 2, limit: 10 });
+    expect(repository.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 }),
+    );
+  });
+
+  it('nunca deixa o cliente paginar sobre pedidos alheios', async () => {
+    // O filtro de dono precisa estar no where junto com skip/take: paginar
+    // primeiro e filtrar depois vazaria a contagem de pedidos de outros.
+    repository.findAndCount.mockResolvedValue([[], 0]);
+
+    await service.findAll(cliente, { page: 3 });
+
+    expect(repository.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: cliente.id } }),
+    );
   });
 
   // ---------------------------------------------
@@ -296,5 +328,170 @@ describe('Serviço de pedidos', () => {
       BadRequestException,
     );
     expect(repository.manager.transaction).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------
+  // Ciclo de vida do pedido (status)
+  // Monta a transação com o pedido no estado pedido e produtos para o
+  // estorno, devolvendo os mocks para inspecionar lock, save e ordem.
+  // ---------------------------------------------
+  function mockStatusFlow(status: OrderStatus, userId = cliente.id) {
+    const order = Object.assign(new Order(), { id: 5, status, userId });
+    const items = [
+      Object.assign(new OrderItem(), { productId: 20, quantity: 3 }),
+      Object.assign(new OrderItem(), { productId: 10, quantity: 2 }),
+    ];
+    const produtos = new Map<number, Product>([
+      [10, Object.assign(new Product(), { id: 10, name: 'A', stock: 1 })],
+      [20, Object.assign(new Product(), { id: 20, name: 'B', stock: 4 })],
+    ]);
+    const manager = {
+      findOne: jest.fn().mockImplementation((entity: unknown, options: any) => {
+        if (entity === Order) return Promise.resolve(order);
+        return Promise.resolve(produtos.get(options.where.id as number));
+      }),
+      findBy: jest.fn().mockResolvedValue(items),
+      save: jest.fn().mockImplementation((entity: unknown) => entity),
+    };
+    repository.manager.transaction.mockImplementation(
+      (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+    return { order, items, produtos, manager };
+  }
+
+  it('permite ao administrador marcar pedido pendente como pago', async () => {
+    const { order } = mockStatusFlow(OrderStatus.PENDENTE);
+
+    const result = await service.updateStatus(
+      5,
+      { status: OrderStatus.PAGO },
+      admin,
+    );
+
+    expect(result.status).toBe(OrderStatus.PAGO);
+  });
+
+  it('recusa cliente marcando o próprio pedido como pago', async () => {
+    mockStatusFlow(OrderStatus.PENDENTE);
+
+    await expect(
+      service.updateStatus(5, { status: OrderStatus.PAGO }, cliente),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('permite ao cliente cancelar o próprio pedido pendente', async () => {
+    const { order } = mockStatusFlow(OrderStatus.PENDENTE);
+
+    const result = await service.updateStatus(
+      5,
+      { status: OrderStatus.CANCELADO },
+      cliente,
+    );
+
+    expect(result.status).toBe(OrderStatus.CANCELADO);
+    expect(order.status).toBe(OrderStatus.CANCELADO);
+  });
+
+  it('estorna ao estoque a quantidade exata de cada item ao cancelar', async () => {
+    const { produtos } = mockStatusFlow(OrderStatus.PENDENTE);
+
+    await service.updateStatus(
+      5,
+      { status: OrderStatus.CANCELADO },
+      cliente,
+    );
+
+    expect(produtos.get(10)!.stock).toBe(3);
+    expect(produtos.get(20)!.stock).toBe(7);
+  });
+
+  it('trava os produtos do estorno em ordem crescente de productId', async () => {
+    // Mesma ordem usada na criação: sem isso, cancelar e criar em paralelo
+    // pediriam os bloqueios em ordens opostas e travariam em deadlock.
+    const { manager } = mockStatusFlow(OrderStatus.PENDENTE);
+
+    await service.updateStatus(
+      5,
+      { status: OrderStatus.CANCELADO },
+      cliente,
+    );
+
+    const idsTravados = manager.findOne.mock.calls
+      .filter((call) => call[0] === Product)
+      .map((call) => (call[1] as { where: { id: number } }).where.id);
+    expect(idsTravados).toEqual([10, 20]);
+  });
+
+  it('permite ao administrador cancelar pedido já pago', async () => {
+    mockStatusFlow(OrderStatus.PAGO);
+
+    const result = await service.updateStatus(
+      5,
+      { status: OrderStatus.CANCELADO },
+      admin,
+    );
+
+    expect(result.status).toBe(OrderStatus.CANCELADO);
+  });
+
+  it('recusa cliente cancelando pedido já pago', async () => {
+    mockStatusFlow(OrderStatus.PAGO);
+
+    await expect(
+      service.updateStatus(5, { status: OrderStatus.CANCELADO }, cliente),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('recusa qualquer transição a partir de pedido cancelado', async () => {
+    mockStatusFlow(OrderStatus.CANCELADO);
+
+    await expect(
+      service.updateStatus(5, { status: OrderStatus.PAGO }, admin),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('recusa transição para o mesmo status atual', async () => {
+    mockStatusFlow(OrderStatus.PENDENTE);
+
+    await expect(
+      service.updateStatus(5, { status: OrderStatus.PENDENTE }, admin),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('devolve 404 quando o pedido é de outro usuário', async () => {
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(null),
+      findBy: jest.fn(),
+      save: jest.fn(),
+    };
+    repository.manager.transaction.mockImplementation(
+      (operation: (entityManager: typeof manager) => Promise<Order>) =>
+        operation(manager),
+    );
+
+    await expect(
+      service.updateStatus(5, { status: OrderStatus.CANCELADO }, cliente),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('relê o pedido com lock de escrita dentro da transação', async () => {
+    // Sem o lock, duas requisições concorrentes leriam o mesmo status
+    // PENDENTE e as duas estornariam o estoque.
+    const { manager } = mockStatusFlow(OrderStatus.PENDENTE);
+
+    await service.updateStatus(
+      5,
+      { status: OrderStatus.CANCELADO },
+      cliente,
+    );
+
+    const chamadaDoPedido = manager.findOne.mock.calls.find(
+      (call) => call[0] === Order,
+    );
+    expect(chamadaDoPedido?.[1]).toMatchObject({
+      lock: { mode: 'pessimistic_write' },
+      where: { id: 5, userId: cliente.id },
+    });
   });
 });

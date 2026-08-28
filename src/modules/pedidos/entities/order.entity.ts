@@ -11,6 +11,12 @@ import {
 import { OrderItem } from './order-item.entity';
 import { User } from '../../usuarios/entities/user.entity';
 
+export enum OrderStatus {
+  PENDENTE = 'PENDENTE',
+  PAGO = 'PAGO',
+  CANCELADO = 'CANCELADO',
+}
+
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn()
@@ -24,6 +30,18 @@ export class Order {
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
+
+  // ---------------------------------------------
+  // Situação do pedido
+  // Pedido nasce PENDENTE. CANCELADO é terminal e devolve o estoque; os
+  // estados de logística ficam de fora enquanto não houver entrega no sistema.
+  // ---------------------------------------------
+  @Column({
+    type: 'enum',
+    enum: OrderStatus,
+    default: OrderStatus.PENDENTE,
+  })
+  status: OrderStatus;
 
   // ---------------------------------------------
   // Dono do pedido
