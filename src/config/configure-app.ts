@@ -34,7 +34,7 @@ export function configureApp(app: INestApplication): void {
   app.enableCors({
     origin: [frontendOrigin],
     credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   });
 }

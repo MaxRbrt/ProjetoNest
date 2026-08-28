@@ -5,8 +5,15 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  Paginated,
+  resolvePagination,
+  toPaginated,
+} from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Product } from '../produtos/entities/product.entity';
 
 @Injectable()
@@ -17,10 +24,15 @@ export class CategoriesService {
   ) {}
 
   // ---------------------------------------------
-  // Listagem de categorias
+  // Listagem paginada de categorias
   // ---------------------------------------------
-  findAll(): Promise<Category[]> {
-    return this.categoriesRepository.find();
+  async findAll(query: PaginationQueryDto): Promise<Paginated<Category>> {
+    const { page, limit, skip, take } = resolvePagination(query);
+    const [data, total] = await this.categoriesRepository.findAndCount({
+      skip,
+      take,
+    });
+    return toPaginated(data, total, page, limit);
   }
 
   // ---------------------------------------------
@@ -39,6 +51,17 @@ export class CategoriesService {
   // ---------------------------------------------
   create(dto: CreateCategoryDto): Promise<Category> {
     const category = this.categoriesRepository.create(dto);
+    return this.categoriesRepository.save(category);
+  }
+
+  // ---------------------------------------------
+  // Atualização de categoria
+  // Campo ausente no DTO preserva o valor atual: o Object.assign só sobrescreve
+  // o que veio na requisição, espelhando o comportamento de produtos.
+  // ---------------------------------------------
+  async update(id: number, dto: UpdateCategoryDto): Promise<Category> {
+    const category = await this.findOne(id);
+    Object.assign(category, dto);
     return this.categoriesRepository.save(category);
   }
 

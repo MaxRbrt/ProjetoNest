@@ -8,7 +8,10 @@ import {
   Param,
   ParseIntPipe,
   HttpCode,
+  Query,
 } from '@nestjs/common';
+import { Paginated } from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -28,8 +31,8 @@ export class ProductsController {
   // Listagem de produtos
   // ---------------------------------------------
   @Get()
-  findAll(): Promise<Product[]> {
-    return this.productsService.findAll();
+  findAll(@Query() query: PaginationQueryDto): Promise<Paginated<Product>> {
+    return this.productsService.findAll(query);
   }
 
   // ---------------------------------------------

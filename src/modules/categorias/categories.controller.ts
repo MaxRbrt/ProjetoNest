@@ -6,11 +6,16 @@ import {
   Param,
   HttpCode,
   ParseIntPipe,
+  Patch,
+  Query,
   Delete,
 } from '@nestjs/common';
+import { Paginated } from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Roles } from '../../decorators/roles.decorator';
 import { Role } from '../usuarios/entities/user.entity';
 
@@ -26,8 +31,10 @@ export class CategoriesController {
   // Listagem de categorias
   // ---------------------------------------------
   @Get()
-  findAll(): Promise<Category[]> {
-    return this.categoriesService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<Paginated<Category>> {
+    return this.categoriesService.findAll(query);
   }
 
   // ---------------------------------------------
@@ -45,6 +52,18 @@ export class CategoriesController {
   @Post()
   create(@Body() dto: CreateCategoryDto): Promise<Category> {
     return this.categoriesService.create(dto);
+  }
+
+  // ---------------------------------------------
+  // Atualização de categoria
+  // ---------------------------------------------
+  @Roles(Role.ADMIN)
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+  ): Promise<Category> {
+    return this.categoriesService.update(id, dto);
   }
 
   // ---------------------------------------------

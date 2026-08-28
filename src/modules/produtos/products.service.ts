@@ -5,6 +5,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  Paginated,
+  resolvePagination,
+  toPaginated,
+} from '../../common/dto/paginated';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -20,10 +26,15 @@ export class ProductsService {
   ) {}
 
   // ---------------------------------------------
-  // Listagem de produtos
+  // Listagem paginada de produtos
   // ---------------------------------------------
-  findAll(): Promise<Product[]> {
-    return this.productsRepository.find();
+  async findAll(query: PaginationQueryDto): Promise<Paginated<Product>> {
+    const { page, limit, skip, take } = resolvePagination(query);
+    const [data, total] = await this.productsRepository.findAndCount({
+      skip,
+      take,
+    });
+    return toPaginated(data, total, page, limit);
   }
 
   // ---------------------------------------------
