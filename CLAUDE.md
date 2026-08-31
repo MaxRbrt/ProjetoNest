@@ -21,7 +21,7 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 | Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
-| Testes | 24 suítes / 138 testes unitários. **Sem E2E** — ver dívidas |
+| Testes | **Nenhum.** Os 153 testes unitários foram removidos em 2026-08-31 — ver dívidas |
 
 ## Decisões que não são óbvias no código
 
@@ -60,10 +60,19 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 
 ## Dívidas conhecidas (decisões conscientes, não esquecimento)
 
-1. **Sem testes E2E.** Falta `TEST_DATABASE_URL` — um banco isolado. O único e2e existente
-   (`test/app.e2e-spec.ts`) fica em `describe.skip` sem essa variável. Consequência: os testes de
-   lock usam mocks, então **não há prova de concorrência contra Postgres real**. É a dívida mais
-   relevante da lista.
+1. **Nenhum teste automatizado.** Os 25 arquivos de teste (153 testes) e o esqueleto de E2E foram
+   removidos em 2026-08-31, por decisão do proprietário, para reduzir o volume do código-fonte. Eles
+   não pesavam em produção — o `tsconfig.build.json` já os excluía do `dist` —, então a remoção é
+   sobre navegação do repositório, não sobre o artefato publicado.
+
+   **Estão recuperáveis do histórico do git**, no commit imediatamente anterior ao da remoção:
+   `git checkout <commit-anterior> -- "src/**/*.spec.ts" test/`.
+
+   Consequência a considerar antes de mexer em autenticação, sessão ou concorrência: não há mais
+   rede de proteção. A suíte removida pegou, nesta mesma sessão, um segundo validador de senha
+   escondido no serviço, cinco corridas de sessão no frontend e um travamento sob StrictMode —
+   nenhum deles visível em teste manual. Se o projeto voltar a evoluir nessas áreas, vale restaurar
+   ao menos os testes de `auth`. É a dívida mais relevante da lista.
 2. **Dinheiro em ponto flutuante.** `Product.price`, `Order.total` e `OrderItem.unitPrice` usam
    `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
    quebraria todo cálculo de total, comparação de estoque e testes. Merece subprojeto próprio.
@@ -88,6 +97,15 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 
   Bloco só com título também vale, quando a seção se explica. **Nada de comentário solto no meio do
   corpo da função** — a explicação inteira vai uma vez só no bloco do topo, e o corpo roda limpo.
+- **Pasta só existe quando agrupa mais de um arquivo.** Reorganização de 2026-08-31: uma pasta
+  `entities/` com uma única entidade some e o arquivo sobe para a raiz do módulo (`categorias`,
+  `produtos`, `usuarios`); onde há coleção real, a pasta fica (`auth/entities` com 3,
+  `pedidos/entities` com 2). Mesma regra aplicada a `auth/interceptors` e `auth/strategies`, que
+  tinham um arquivo cada. A estrutura reflete o conteúdo, não simetria decorativa.
+- **`src/scripts/seed-admin.ts` precisa ficar dentro de `src/`.** Enquanto viveu em `scripts/` na
+  raiz, ampliava a raiz de compilação e o build gerava `dist/src/main.js`, enquanto `start:prod`
+  aponta para `dist/main` — ou seja, `start:prod` estava quebrado e ninguém notou, porque em
+  desenvolvimento se usa `start` e `start:dev`.
 - **Nomes de pasta são mistos de propósito:** `src/modules/auth/` e `src/modules/email/` em inglês;
   `usuarios/`, `produtos/`, `categorias/`, `pedidos/` em português. Nomes de **arquivo** continuam em
   inglês (`orders.service.ts` dentro de `pedidos/`). Não normalizar sem pedido explícito.
@@ -125,8 +143,7 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 | Comando | Para quê |
 |---|---|
 | `npm run start` / `start:dev` | Sobe a API (porta 3000) |
-| `npx jest` | Testes unitários |
-| `npx tsc -p tsconfig.build.json --noEmit` | Checagem de tipos (o `tsc` sem esse config acusa erros pré-existentes nos specs) |
+| `npx tsc -p tsconfig.build.json --noEmit` | Checagem de tipos |
 | `npm run format` | Prettier |
 | `npm run migration:run` / `migration:revert` | Migrations |
 | `npm run seed:admin -- <email> --confirm-target=...` | Promove usuário a ADMIN |

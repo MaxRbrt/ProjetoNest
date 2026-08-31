@@ -133,18 +133,6 @@ devolve o pedido já criado, em vez de duplicar; a mesma chave com um carrinho d
 - **Migrations versionadas com `synchronize` desligado.** O schema nunca muda sozinho a partir das
   entidades.
 
-## Testes
-
-```bash
-npx jest                                    # 138 testes unitários
-npx tsc -p tsconfig.build.json --noEmit     # checagem de tipos
-```
-
-Os testes end-to-end dependem de `TEST_DATABASE_URL` apontando para um banco isolado; sem essa
-variável a suíte e2e é ignorada. Consequência conhecida: os testes de lock usam mocks, então **não há
-cobertura automatizada de concorrência contra um Postgres real** — os cenários de corrida foram
-verificados manualmente.
-
 ## Estrutura
 
 ```
@@ -153,6 +141,7 @@ src/
 ├─ config/              validação de ambiente, configuração HTTP e OpenAPI
 ├─ db/                  data source e migrations
 ├─ decorators/          @Public, @Roles, @CurrentUser
+├─ scripts/             promoção de usuário a administrador
 └─ modules/
    ├─ auth/             autenticação, sessões, tokens, guards
    ├─ usuarios/         entidade de usuário e projeção pública
@@ -161,6 +150,9 @@ src/
    ├─ pedidos/          pedidos, itens e ciclo de vida
    └─ email/            envio transacional via Resend
 ```
+
+Subpasta só existe quando agrupa mais de um arquivo: onde o módulo tem uma única entidade, ela fica
+na raiz do módulo; onde há uma coleção (`auth`, `pedidos`), a pasta `entities/` permanece.
 
 Os nomes de pasta em português convivem com `auth/` e `email/` em inglês por decisão do projeto;
 nomes de arquivo e identificadores de código permanecem em inglês.
