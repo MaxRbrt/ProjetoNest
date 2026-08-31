@@ -12,7 +12,7 @@ describe('DTOs de autenticação', () => {
   it('normaliza email sem alterar a senha', async () => {
     const input = {
       email: '  Usuario@Example.COM  ',
-      password: '  frase senha segura  ',
+      password: '  Frase senha segura 1@  ',
     };
     const dto = plainToInstance(RegisterDto, input);
 
@@ -24,12 +24,12 @@ describe('DTOs de autenticação', () => {
   it('aplica a mesma normalização ao login', async () => {
     const dto = plainToInstance(LoginDto, {
       email: ' USUARIO@EXAMPLE.COM ',
-      password: 'senha fornecida sem trim',
+      password: 'Senha fornecida sem trim 1@',
     });
 
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.email).toBe('usuario@example.com');
-    expect(dto.password).toBe('senha fornecida sem trim');
+    expect(dto.password).toBe('Senha fornecida sem trim 1@');
   });
 
   // ---------------------------------------------
@@ -42,7 +42,7 @@ describe('DTOs de autenticação', () => {
   });
 
   it('valida a nova senha no reset sem aplicar trim', async () => {
-    const password = '  nova frase senha  ';
+    const password = '  Nova frase senha 1@  ';
     const dto = plainToInstance(ResetPasswordDto, {
       token: 'A'.repeat(43),
       newPassword: password,

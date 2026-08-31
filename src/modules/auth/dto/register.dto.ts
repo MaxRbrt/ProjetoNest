@@ -1,9 +1,7 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
 import { EmailDto } from './email.dto';
+import { SenhaValida } from '../password-policy';
 
 export class RegisterDto extends EmailDto {
-  @IsString()
-  @MinLength(15)
-  @MaxLength(128)
+  @SenhaValida()
   password: string;
 }
