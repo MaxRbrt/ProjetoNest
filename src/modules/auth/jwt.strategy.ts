@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { isUUID } from 'class-validator';
-import { PublicUser } from '../../usuarios/users.service';
-import { SessionsService } from '../services/sessions.service';
+import { PublicUser } from '../usuarios/users.service';
+import { SessionsService } from './services/sessions.service';
 
 interface AccessTokenPayload {
   sub?: unknown;

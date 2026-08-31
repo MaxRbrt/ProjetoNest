@@ -1,5 +1,5 @@
 import { DataSource, type DataSourceOptions } from 'typeorm';
-import { Role, User } from '../src/modules/usuarios/entities/user.entity';
+import { Role, User } from '../modules/usuarios/user.entity';
 
 type DataSourceFactory = () => DataSource;
 
@@ -85,12 +85,14 @@ export async function promoteAdmin(
 // isso não pode acontecer durante a importação deste módulo em testes.
 // ---------------------------------------------
 async function main(): Promise<void> {
-  const { dataSourceOptions } = require('../src/db/data-source') as {
+  const { dataSourceOptions } = require('../db/data-source') as {
     dataSourceOptions: DataSourceOptions;
   };
   const url = (dataSourceOptions as { url?: string }).url;
   if (!url) {
-    throw new Error('Configuração de banco sem URL — não é possível confirmar o alvo.');
+    throw new Error(
+      'Configuração de banco sem URL — não é possível confirmar o alvo.',
+    );
   }
   const target = extractTarget(url);
   const message = await promoteAdmin(

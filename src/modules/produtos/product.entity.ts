@@ -6,8 +6,8 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Category } from '../../categorias/entities/category.entity';
-import { OrderItem } from '../../pedidos/entities/order-item.entity';
+import { Category } from '../categorias/category.entity';
+import { OrderItem } from '../pedidos/entities/order-item.entity';
 
 @Entity('products')
 export class Product {

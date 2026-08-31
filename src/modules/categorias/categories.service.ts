@@ -11,10 +11,10 @@ import {
   toPaginated,
 } from '../../common/dto/paginated';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { Category } from './entities/category.entity';
+import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { Product } from '../produtos/entities/product.entity';
+import { Product } from '../produtos/product.entity';
 
 @Injectable()
 export class CategoriesService {

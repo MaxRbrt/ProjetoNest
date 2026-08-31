@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, IsNull, MoreThan, Not, Repository } from 'typeorm';
-import { User } from '../../usuarios/entities/user.entity';
+import { User } from '../../usuarios/user.entity';
 import {
   EMAIL_VERIFICATION_TTL_MS,
   PASSWORD_RESET_TTL_MS,
