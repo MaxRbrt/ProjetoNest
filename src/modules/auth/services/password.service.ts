@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { exigenciasNaoCumpridas } from '../password-policy';
 import { PwnedPasswordsService } from './pwned-passwords.service';
 
 const ARGON2_OPTIONS = {
@@ -18,15 +19,15 @@ export class PasswordService {
 
   // ---------------------------------------------
   // Validação e derivação de senha
+  // A política é reavaliada aqui, e não só no DTO: este serviço também é
+  // chamado por fluxos que não passam por requisição HTTP, e confiar apenas
+  // na validação de entrada deixaria uma porta sem tranca. A regra vem do
+  // mesmo módulo usado pelos DTOs, para que os dois nunca divirjam.
   // ---------------------------------------------
   async hash(password: string): Promise<string> {
-    // Array.from conta pontos de código Unicode, evitando tratar um caractere
-    // fora do BMP como duas unidades UTF-16.
-    const length = Array.from(password).length;
-    if (length < 15 || length > 128) {
-      throw new BadRequestException(
-        'A senha deve ter entre 15 e 128 caracteres.',
-      );
+    const faltas = exigenciasNaoCumpridas(password);
+    if (faltas.length > 0) {
+      throw new BadRequestException(`A senha precisa ${faltas.join(', ')}.`);
     }
 
     if (await this.pwnedPasswords.isCompromised(password)) {

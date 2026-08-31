@@ -1,98 +1,170 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# projeto-test — API de catálogo e pedidos
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST de e-commerce construída com NestJS, TypeORM e PostgreSQL (Supabase).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Projeto de estudo com um objetivo específico: implementar autenticação, autorização e controle de
+concorrência **por dentro**, em vez de terceirizar para serviços que escondem o funcionamento. A
+autenticação é JWT manual com sessões revogáveis — não usa Supabase Auth — porque entender o
+mecanismo é o ponto.
 
-## Description
+## O que está implementado
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+**Autenticação** — cadastro com verificação de email, login, refresh token rotativo, logout,
+recuperação de senha. Senhas com Argon2id, checadas contra a base de vazamentos do Have I Been Pwned
+(por k-anonymity, a senha nunca sai da aplicação). Sessões persistidas e revogáveis, rate limiting,
+respostas com tempo mínimo constante para não vazar existência de conta por diferença de latência.
 
-## Project setup
+**Autorização** — o guard de autenticação é global: toda rota nasce protegida e `@Public()` é a
+única forma de liberar, o que torna a exceção explícita e auditável. Papéis `ADMIN` e `CLIENTE` via
+`@Roles()`. O papel nunca vem da requisição — só um script administrativo promove alguém.
 
-```bash
-$ npm install
-```
+**Catálogo** — produtos e categorias com CRUD completo. Leitura liberada a qualquer usuário
+autenticado; escrita restrita a administradores. Listagens paginadas, com filtro por categoria e
+busca por nome.
 
-## Compile and run the project
+**Pedidos** — criação transacional com baixa de estoque sob lock pessimista, idempotência via
+cabeçalho `Idempotency-Key` (um retry de rede não duplica pedido nem baixa estoque duas vezes), e
+ciclo de vida `PENDENTE → PAGO → CANCELADO` com estorno de estoque no cancelamento. Cada cliente só
+enxerga e altera os próprios pedidos.
 
-```bash
-# development
-$ npm run start
+## Requisitos
 
-# watch mode
-$ npm run start:dev
+- Node.js 20+
+- Um banco PostgreSQL (o projeto foi desenvolvido contra Supabase)
+- Uma conta no [Resend](https://resend.com) para envio dos emails de verificação e recuperação
 
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+## Como rodar
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
+cp .env.example .env    # preencha os valores reais
+npm run migration:run
+npm run start:dev
 ```
 
-## Deployment
+A API sobe em `http://localhost:3000` e a documentação interativa fica em
+`http://localhost:3000/docs`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Variáveis de ambiente
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+A aplicação valida a configuração no boot e falha listando **todos** os problemas de uma vez, em vez
+de um por inicialização.
+
+| Variável | Obrigatória | Observação |
+|---|---|---|
+| `DATABASE_URL` | sim | URL PostgreSQL |
+| `JWT_SECRET` | sim | mínimo de 32 bytes; placeholders são rejeitados |
+| `JWT_ISSUER` | sim | emissor declarado no token |
+| `JWT_AUDIENCE` | sim | audiência esperada do token |
+| `RESEND_API_KEY` | sim | precisa começar com `re_` |
+| `EMAIL_FROM` | sim | remetente dos emails transacionais |
+| `FRONTEND_URL` | sim | origem liberada no CORS; exige HTTPS em produção |
+| `NODE_ENV` | não | `development`, `test` ou `production` |
+| `TEST_DATABASE_URL` | não | banco isolado para testes; precisa ser diferente de `DATABASE_URL` |
+| `HIBP_API_URL` | não | padrão `https://api.pwnedpasswords.com` |
+| `HIBP_TIMEOUT_MS` | não | padrão `3000` |
+| `AUTH_MIN_RESPONSE_MS` | não | padrão `500` |
+
+### Criando um administrador
+
+A API nunca aceita `role` no cadastro. Para promover um usuário já registrado:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run seed:admin -- usuario@example.com
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+O comando falha de propósito na primeira execução, mostrando o banco que seria afetado. Rode de novo
+com a confirmação que ele indicar:
 
-## Resources
+```bash
+npm run seed:admin -- usuario@example.com --confirm-target=usuario@host:5432/postgres
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+A confirmação inclui usuário e porta, não apenas host e banco: o pooler do Supabase compartilha o
+mesmo host entre projetos diferentes, e host sozinho não identifica o destino.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Endpoints
 
-## Support
+Documentação completa e navegável em `/docs` (desligada quando `NODE_ENV=production`).
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+| Método | Rota | Acesso |
+|---|---|---|
+| `POST` | `/auth/register` | público |
+| `POST` | `/auth/verify-email` | público |
+| `POST` | `/auth/resend-verification` | público |
+| `POST` | `/auth/login` | público |
+| `POST` | `/auth/refresh` | público (usa o refresh token) |
+| `POST` | `/auth/logout` | público (usa o refresh token) |
+| `POST` | `/auth/forgot-password` | público |
+| `POST` | `/auth/reset-password` | público |
+| `GET` | `/auth/me` | autenticado |
+| `GET` | `/products`, `/products/:id` | autenticado |
+| `POST` `PATCH` `DELETE` | `/products`, `/products/:id` | **ADMIN** |
+| `GET` | `/categories`, `/categories/:id` | autenticado |
+| `POST` `PATCH` `DELETE` | `/categories`, `/categories/:id` | **ADMIN** |
+| `GET` | `/orders`, `/orders/:id` | autenticado (só os próprios; ADMIN vê todos) |
+| `POST` | `/orders` | autenticado |
+| `PATCH` | `/orders/:id/status` | dono ou ADMIN, conforme a transição |
 
-## Stay in touch
+### Paginação
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+As listagens aceitam `?page=1&limit=20` (limite máximo de 100) e devolvem um envelope:
 
-## License
+```json
+{ "data": [], "total": 137, "page": 1, "limit": 20 }
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+`GET /products` aceita também `?categoryId=` e `?name=` (busca parcial, sem diferenciar maiúsculas).
+
+### Idempotência na criação de pedido
+
+`POST /orders` aceita o cabeçalho `Idempotency-Key`. Repetir a mesma chave com o mesmo carrinho
+devolve o pedido já criado, em vez de duplicar; a mesma chave com um carrinho diferente responde
+`409`. Sem o cabeçalho, cada chamada cria um pedido novo.
+
+## Decisões de segurança que explicam o comportamento da API
+
+- **Pedido de outro usuário devolve `404`, não `403`.** Um `403` confirmaria que o pedido existe e,
+  com ids sequenciais, permitiria descobrir o volume de pedidos de terceiros.
+- **Cadastro e recuperação de senha respondem sempre a mesma mensagem genérica**, independentemente
+  de o email existir, para não permitir enumeração de contas.
+- **`role` não é aceito no corpo de nenhuma requisição.** O `ValidationPipe` global usa
+  `forbidNonWhitelisted`, então enviar o campo resulta em `400`.
+- **Migrations versionadas com `synchronize` desligado.** O schema nunca muda sozinho a partir das
+  entidades.
+
+## Testes
+
+```bash
+npx jest                                    # 138 testes unitários
+npx tsc -p tsconfig.build.json --noEmit     # checagem de tipos
+```
+
+Os testes end-to-end dependem de `TEST_DATABASE_URL` apontando para um banco isolado; sem essa
+variável a suíte e2e é ignorada. Consequência conhecida: os testes de lock usam mocks, então **não há
+cobertura automatizada de concorrência contra um Postgres real** — os cenários de corrida foram
+verificados manualmente.
+
+## Estrutura
+
+```
+src/
+├─ common/dto/          paginação compartilhada
+├─ config/              validação de ambiente, configuração HTTP e OpenAPI
+├─ db/                  data source e migrations
+├─ decorators/          @Public, @Roles, @CurrentUser
+└─ modules/
+   ├─ auth/             autenticação, sessões, tokens, guards
+   ├─ usuarios/         entidade de usuário e projeção pública
+   ├─ produtos/         catálogo de produtos
+   ├─ categorias/       catálogo de categorias
+   ├─ pedidos/          pedidos, itens e ciclo de vida
+   └─ email/            envio transacional via Resend
+```
+
+Os nomes de pasta em português convivem com `auth/` e `email/` em inglês por decisão do projeto;
+nomes de arquivo e identificadores de código permanecem em inglês.
+
+## Licença
+
+Projeto de estudo, sem licença de uso definida.

@@ -18,7 +18,7 @@ describe('PasswordService', () => {
   // Derivação e preservação da senha
   // ---------------------------------------------
   it('gera Argon2id com os parâmetros aprovados e valida o hash', async () => {
-    const password = 'uma frase-senha segura';
+    const password = 'Uma frase-senha segura 1!';
     const passwordHash = await service.hash(password);
 
     expect(passwordHash).toMatch(/^\$argon2id\$v=19\$/);
@@ -30,7 +30,7 @@ describe('PasswordService', () => {
   });
 
   it('não remove espaços da senha', async () => {
-    const password = '  frase senha segura  ';
+    const password = '  Frase senha segura 1!  ';
     const passwordHash = await service.hash(password);
 
     await expect(service.verify(passwordHash, password)).resolves.toBe(true);
@@ -42,8 +42,8 @@ describe('PasswordService', () => {
   // ---------------------------------------------
   // Regras de tamanho e exposição em vazamentos
   // ---------------------------------------------
-  it.each(['a'.repeat(14), 'a'.repeat(129)])(
-    'rejeita senha fora de 15 a 128 caracteres',
+  it.each(['Aa1@bc', `Aa1@${'b'.repeat(130)}`])(
+    'rejeita senha fora de 8 a 128 caracteres',
     async (password) => {
       await expect(service.hash(password)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -52,16 +52,31 @@ describe('PasswordService', () => {
     },
   );
 
-  it('conta caracteres Unicode, não unidades UTF-16', async () => {
-    const password = '😀'.repeat(15);
+  it.each([
+    ['sem maiúscula', 'senha@123'],
+    ['sem número', 'SenhaSegura@'],
+    ['sem caractere especial', 'SenhaSegura1'],
+  ])('rejeita senha %s', async (_caso, password) => {
+    await expect(service.hash(password)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(compromised).not.toHaveBeenCalled();
+  });
 
+  it('conta pontos de código Unicode, não unidades UTF-16', async () => {
+    // 128 pontos de código, mas 252 unidades UTF-16: contando errado, esta
+    // senha válida seria recusada por estourar o limite máximo.
+    const password = `Aa1@${'😀'.repeat(124)}`;
+
+    expect(Array.from(password)).toHaveLength(128);
+    expect(password.length).toBeGreaterThan(128);
     await expect(service.hash(password)).resolves.toMatch(/^\$argon2id\$/);
   });
 
   it('rejeita senha encontrada no corpus comprometido', async () => {
     compromised.mockResolvedValue(true);
 
-    await expect(service.hash('uma senha comprometida')).rejects.toThrow(
+    await expect(service.hash('Uma senha comprometida 1!')).rejects.toThrow(
       'Escolha uma senha que não apareça em vazamentos conhecidos.',
     );
   });

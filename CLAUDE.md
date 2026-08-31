@@ -29,6 +29,18 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 - **Pedido alheio devolve 404, não 403.** Um 403 confirmaria que o pedido existe e, com ids
   sequenciais, permitiria enumerar o volume de pedidos de terceiros. Vale para `GET /orders/:id` e
   para `PATCH /orders/:id/status`.
+- **Política de senha: mínimo 8 caracteres, com maiúscula, número e símbolo.** Decisão explícita do
+  proprietário em 2026-08-31, substituindo o mínimo anterior de 15 sem exigência de composição. A
+  regra vive num lugar só (`src/modules/auth/password-policy.ts`) e é aplicada **duas vezes**: nos
+  DTOs, para responder 400 com a lista do que falta, e dentro de `PasswordService.hash`, porque o
+  serviço também é chamado por fluxos que não passam por requisição HTTP. Contagem por pontos de
+  código (`Array.from`), não por `length`: um emoji valeria por dois caracteres.
+
+  Ressalva registrada, não resolvida: exigir composição com mínimo baixo tende a produzir senhas
+  previsíveis — `Senha@12` cumpre todas as regras. O que segura a barra é a checagem HIBP, que na
+  verificação real **rejeitou exatamente essa senha** por constar em vazamentos. Se a checagem HIBP
+  for algum dia desativada, esta política fica frágil.
+
 - **O papel do usuário nunca vem da requisição.** `RegisterDto` não declara `role` e o
   `ValidationPipe` global usa `forbidNonWhitelisted`. Promover alguém só via
   `npm run seed:admin -- <email> --confirm-target=<user>@<host>:<port>/<database>`, que exige
