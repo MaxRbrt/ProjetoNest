@@ -10,7 +10,7 @@ import {
   resolvePagination,
   toPaginated,
 } from '../../common/dto/paginated';
-import { Product } from './entities/product.entity';
+import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';

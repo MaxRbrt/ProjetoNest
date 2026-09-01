@@ -23,7 +23,7 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { OriginGuard } from './guards/origin.guard';
-import { NoStoreInterceptor } from './interceptors/no-store.interceptor';
+import { NoStoreInterceptor } from './no-store.interceptor';
 import { RefreshCookieService } from './services/refresh-cookie.service';
 import type { AuthenticatedSession } from './services/sessions.service';
 

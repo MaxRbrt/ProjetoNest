@@ -16,8 +16,8 @@ import {
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Order, OrderStatus } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
-import { Product } from '../produtos/entities/product.entity';
-import { Role } from '../usuarios/entities/user.entity';
+import { Product } from '../produtos/product.entity';
+import { Role } from '../usuarios/user.entity';
 import { PublicUser } from '../usuarios/users.service';
 import { CreateOrderDto, CreateOrderItemDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';

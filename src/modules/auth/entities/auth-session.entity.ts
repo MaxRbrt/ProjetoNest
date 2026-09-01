@@ -7,7 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from '../../usuarios/entities/user.entity';
+import { User } from '../../usuarios/user.entity';
 
 @Entity('auth_sessions')
 @Index('IDX_auth_sessions_user_id', ['userId'])

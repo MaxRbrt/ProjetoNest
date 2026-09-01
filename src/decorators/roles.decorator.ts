@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { Role } from '../modules/usuarios/entities/user.entity';
+import { Role } from '../modules/usuarios/user.entity';
 
 // ---------------------------------------------
 // Exigência de papel na rota

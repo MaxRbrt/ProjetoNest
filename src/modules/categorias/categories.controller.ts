@@ -15,11 +15,11 @@ import { Paginated } from '../../common/dto/paginated';
 import { ApiPaginatedResponse } from '../../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CategoriesService } from './categories.service';
-import { Category } from './entities/category.entity';
+import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Roles } from '../../decorators/roles.decorator';
-import { Role } from '../usuarios/entities/user.entity';
+import { Role } from '../usuarios/user.entity';
 
 // ---------------------------------------------
 // Catálogo de categorias

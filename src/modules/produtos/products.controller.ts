@@ -14,12 +14,12 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { Paginated } from '../../common/dto/paginated';
 import { ApiPaginatedResponse } from '../../common/dto/paginated-response.dto';
 import { ProductsService } from './products.service';
-import { Product } from './entities/product.entity';
+import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { Roles } from '../../decorators/roles.decorator';
-import { Role } from '../usuarios/entities/user.entity';
+import { Role } from '../usuarios/user.entity';
 
 // ---------------------------------------------
 // Catálogo de produtos

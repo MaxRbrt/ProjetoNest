@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Role, User } from './entities/user.entity';
+import { Role, User } from './user.entity';
 
 export interface PublicUser {
   id: string;

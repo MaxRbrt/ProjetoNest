@@ -9,7 +9,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { OrderItem } from './order-item.entity';
-import { User } from '../../usuarios/entities/user.entity';
+import { User } from '../../usuarios/user.entity';
 
 export enum OrderStatus {
   PENDENTE = 'PENDENTE',
