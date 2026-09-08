@@ -266,7 +266,9 @@ export class PedidosService {
       }
 
       pedido.situacao = dto.situacao;
-      return manager.save(pedido);
+      const salvo = await manager.save(pedido);
+      salvo.itens = await manager.findBy(ItemDoPedido, { pedidoId: id });
+      return salvo;
     });
   }
 

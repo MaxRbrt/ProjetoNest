@@ -77,6 +77,28 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
   continuam usando o caminho eager — falha rápida com mensagem curta é o comportamento certo para uma
   ferramenta de linha de comando, não para o boot da aplicação.
 
+## Bug real — `PATCH /orders/:id/status` não devolvia itens — 2026-09-08
+
+Encontrado durante o clique real do fluxo de compra do frontend (`projeto-test-web`), primeira vez
+que uma tela consumiu o campo `itens` do retorno de uma mudança de situação. `atualizarSituacao`
+(`src/modules/pedidos/pedidos.service.ts`) fazia `manager.findOne(Pedido, { lock: { mode:
+'pessimistic_write' } })` sem `relations: { itens: true }` — carregar a relação junto com o lock
+pessimista vira um outer join, que o Postgres recusa travar (mesma razão já documentada no método
+vizinho `estornarEstoque`). O endpoint sempre devolveu `itens: undefined`; nenhuma rota nem teste
+anterior renderizava esse campo, então ficou invisível até a tela `TelaDeDetalheDoPedido` do frontend
+tentar `pedido.itens.map` depois de cancelar um pedido — `TypeError`, error boundary do React.
+Corrigido carregando os itens à parte, depois do `save`, mesmo padrão já usado em `estornarEstoque`:
+
+```ts
+pedido.situacao = dto.situacao;
+const salvo = await manager.save(pedido);
+salvo.itens = await manager.findBy(ItemDoPedido, { pedidoId: id });
+return salvo;
+```
+
+Verificado com o fluxo completo repetido do zero contra o banco real (novo pedido, cancelamento,
+situação mudando para `CANCELADO` na tela, itens permanecendo visíveis, zero erro de console).
+
 ## Dívidas conhecidas (decisões conscientes, não esquecimento)
 
 1. **Nenhum teste automatizado.** Os 25 arquivos de teste (153 testes) e o esqueleto de E2E foram
