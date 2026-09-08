@@ -8,7 +8,7 @@ import { Response } from 'express';
 import { Observable } from 'rxjs';
 
 @Injectable()
-export class NoStoreInterceptor implements NestInterceptor {
+export class InterceptadorNoStore implements NestInterceptor {
   // ---------------------------------------------
   // Prevenção de cache nas respostas de autenticação
   // Respostas de autenticação podem conter credenciais ou dados sensíveis;

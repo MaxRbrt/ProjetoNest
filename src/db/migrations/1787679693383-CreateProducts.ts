@@ -17,9 +17,9 @@ export class CreateProducts1787679693383 implements MigrationInterface {
 
   // ---------------------------------------------
   // Reversão de produtos e dependências
+  // A chave estrangeira precisa sair antes da tabela que ela protege.
   // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // A chave estrangeira precisa sair antes da tabela que ela protege.
     await queryRunner.query(
       `ALTER TABLE "products" DROP CONSTRAINT "FK_ff56834e735fa78a15d0cf21926"`,
     );

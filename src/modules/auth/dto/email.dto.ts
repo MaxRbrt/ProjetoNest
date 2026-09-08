@@ -7,7 +7,7 @@ export class EmailDto {
   // A transformação fica restrita ao email para não alterar senhas
   // recebidas pelas classes derivadas.
   // ---------------------------------------------
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail({}, { message: 'Informe um email válido.' })
