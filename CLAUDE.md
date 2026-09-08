@@ -18,7 +18,7 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Autenticação | Completa — cadastro, verificação de email, login, refresh rotativo, logout, recuperação de senha, Argon2, checagem HIBP, throttling, sessões revogáveis, `no-store`, `OriginGuard` |
 | Autorização | Completa — guard global (toda rota nasce protegida), `@Public()`, `@Roles()`, ownership de pedido, promoção a admin fora da API |
 | Catálogo | Produtos e categorias com CRUD completo, listagem paginada, filtro por categoria e busca por nome |
-| Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento |
+| Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento, listagem com filtro opcional por `situacao` |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
 | Testes | **Nenhum.** Os 153 testes unitários foram removidos em 2026-08-31 — ver dívidas |
@@ -76,6 +76,23 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
   README de falhar listando todos os problemas de uma vez. `data-source.ts` e `seed-admin.ts` (CLI)
   continuam usando o caminho eager — falha rápida com mensagem curta é o comportamento certo para uma
   ferramenta de linha de comando, não para o boot da aplicação.
+
+## Filtro de status em `GET /orders` — 2026-09-08
+
+Spec: `docs/superpowers/specs/2026-09-08-filtro-status-pedidos-design.md`. Preparação para a futura
+tela admin de gestão de pedidos poder filtrar por situação — sem ela ainda.
+
+`GET /orders?situacao=PAGO` — um valor por vez, opcional, `PENDENTE`/`PAGO`/`CANCELADO`. Vale tanto
+para cliente (filtra os próprios) quanto para admin (filtra todos): combina com AND ao filtro de
+dono já existente, mesmo objeto `where` do TypeORM. Valor fora do enum responde 400 via `@IsEnum`
+(`ConsultaDePedidosDto extends ConsultaPaginadaDto`, mesmo molde de `ConsultaDeProdutosDto`). Sem o
+parâmetro, comportamento anterior preservado integralmente — verificado por `curl` contra o backend
+real: `?situacao=CANCELADO` devolveu só os 2 pedidos cancelados de um total de vários; valor inválido
+(`XPTO`) devolveu 400; sem parâmetro devolveu a lista completa como antes.
+
+Arquivo novo: `src/modules/pedidos/dto/consulta-de-pedidos.dto.ts`. Modificados:
+`pedidos.controller.ts` (`@Query()` troca de tipo), `pedidos.service.ts` (`where.situacao` condicional
+antes do `findAndCount`).
 
 ## Bug real — `PATCH /orders/:id/status` não devolvia itens — 2026-09-08
 

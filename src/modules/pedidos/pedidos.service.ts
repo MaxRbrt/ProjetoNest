@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, FindOptionsWhere, Repository } from 'typeorm';
 import {
   Paginado,
   resolverPaginacao,
@@ -21,6 +21,7 @@ import { Papel } from '../usuarios/usuario.entity';
 import { UsuarioPublico } from '../usuarios/usuarios.service';
 import { CriarPedidoDto, CriarItemDoPedidoDto } from './dto/criar-pedido.dto';
 import { AtualizarSituacaoDoPedidoDto } from './dto/atualizar-situacao-do-pedido.dto';
+import { ConsultaDePedidosDto } from './dto/consulta-de-pedidos.dto';
 
 // ---------------------------------------------
 // Hash do payload para conferência de Idempotency-Key
@@ -149,11 +150,16 @@ export class PedidosService {
   // ---------------------------------------------
   async listar(
     usuario: UsuarioPublico,
-    query: ConsultaPaginadaDto,
+    query: ConsultaDePedidosDto,
   ): Promise<Paginado<Pedido>> {
     const { pagina, limite, skip, take } = resolverPaginacao(query);
+    const where: FindOptionsWhere<Pedido> =
+      usuario.papel === Papel.ADMIN ? {} : { usuarioId: usuario.id };
+    if (query.situacao) {
+      where.situacao = query.situacao;
+    }
     const [dados, total] = await this.repositorioDePedidos.findAndCount({
-      where: usuario.papel === Papel.ADMIN ? {} : { usuarioId: usuario.id },
+      where,
       relations: { itens: true },
       order: { criadoEm: 'DESC', id: 'DESC' },
       skip,
