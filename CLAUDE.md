@@ -21,7 +21,7 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento, listagem com filtro opcional por `situacao` |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
-| Testes | **Nenhum.** Os 153 testes unitários foram removidos em 2026-08-31 — ver dívidas |
+| Testes | Módulo `auth` restaurado em 2026-09-08 (47 testes unitários, `npm test`). Demais módulos sem cobertura — ver dívidas |
 
 ## Decisões que não são óbvias no código
 
@@ -118,19 +118,37 @@ situação mudando para `CANCELADO` na tela, itens permanecendo visíveis, zero 
 
 ## Dívidas conhecidas (decisões conscientes, não esquecimento)
 
-1. **Nenhum teste automatizado.** Os 25 arquivos de teste (153 testes) e o esqueleto de E2E foram
-   removidos em 2026-08-31, por decisão do proprietário, para reduzir o volume do código-fonte. Eles
-   não pesavam em produção — o `tsconfig.build.json` já os excluía do `dist` —, então a remoção é
-   sobre navegação do repositório, não sobre o artefato publicado.
+1. **Testes automatizados restritos a `auth`, e só em nível de unidade.** Plano:
+   `docs/superpowers/plans/2026-09-08-restaurar-testes-auth.md`. 47 testes cobrindo `SenhaService`,
+   `SenhasVazadasService` (HIBP, k-anonimato, cancelamento real por `AbortSignal`), `SessoesService`
+   (rotação de refresh, revogação de família em reuso, logout idempotente), `EstrategiaJwt` e guards
+   (regressão de `request.user`→`request.usuario`), `AutenticacaoService.login` (paridade de resposta
+   entre conta inexistente/bloqueada/senha errada/email não verificado, timing real via fake timers)
+   e um smoke test de boot do módulo via `Test.createTestingModule`. Escrita do zero contra o código
+   atual, não restaurada do git (a sessão nunca roda `git`, e a suíte antiga era pré-refatoração
+   PT-BR de qualquer forma).
 
-   **Estão recuperáveis do histórico do git**, no commit imediatamente anterior ao da remoção:
-   `git checkout <commit-anterior> -- "src/**/*.spec.ts" test/`.
+   **Gap real, apontado por revisão adversarial (Codex) e não corrigido nesta leva:**
+   `sessoes.service.spec.ts` usa um `FakeEntityManager` escrito à mão (não TypeORM real) para simular
+   `transaction`/`findOne`/`save`/`update`. Isso prova a lógica de decisão (branches, mensagens,
+   revogação em memória), mas **não prova**: rollback real de uma transação que lança exceção depois
+   de já ter revogado a família (no Postgres real isso desfaz a revogação — o fake não desfaz nada);
+   que os locks (`pessimistic_write`) de fato serializam operações concorrentes (o teste de "ordem de
+   lock" só prova ordem de chamadas de um método já stubado, não bloqueio real); que
+   `validarSessaoAtiva` filtra de verdade por `usuarioId`/`revogadoEm`/`expiraEm` no banco (o mock do
+   repositório ignora os critérios da query). O smoke test de boot também não pegaria de volta a
+   classe de bug real já registrada abaixo (`@Index` desalinhado) porque os repositórios são
+   substituídos por objetos vazios — a validação de metadados do TypeORM nunca roda.
 
-   Consequência a considerar antes de mexer em autenticação, sessão ou concorrência: não há mais
-   rede de proteção. A suíte removida pegou, nesta mesma sessão, um segundo validador de senha
-   escondido no serviço, cinco corridas de sessão no frontend e um travamento sob StrictMode —
-   nenhum deles visível em teste manual. Se o projeto voltar a evoluir nessas áreas, vale restaurar
-   ao menos os testes de `auth`. É a dívida mais relevante da lista.
+   Fechar esse gap exige teste de integração contra Postgres real (`TEST_DATABASE_URL`, já citado
+   em sessão anterior de auth JWT), com conexões concorrentes de verdade para os cenários de lock —
+   não é extensão do unit test, é uma categoria de teste diferente. Não perguntado nem decidido nesta
+   rodada; próximo passo natural quando o projeto voltar a mexer em `SessoesService`.
+
+   **Demais módulos** (`produtos`, `categorias`, `pedidos`, cadastro/verificação/recuperação de senha
+   dentro do próprio `auth`) continuam sem nenhum teste automatizado — os 25 arquivos originais
+   (153 testes) seguem recuperáveis do histórico do git, no commit imediatamente anterior à remoção
+   de 2026-08-31: `git checkout <commit-anterior> -- "src/**/*.spec.ts" test/`.
 2. **Dinheiro em ponto flutuante.** `Produto.preco`, `Pedido.total` e `ItemDoPedido.precoUnitario`
    usam `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
    quebraria todo cálculo de total, comparação de estoque e testes. Merece subprojeto próprio.
