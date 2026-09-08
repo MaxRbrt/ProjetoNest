@@ -5,6 +5,9 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
 
   // ---------------------------------------------
   // Criação da estrutura de autenticação
+  // Os papéis `anon` e `authenticated` podem não existir fora do Supabase, por
+  // isso o REVOKE deles vai num bloco condicional: a migration continua
+  // portável sem deixar de fechar o acesso onde eles existem.
   // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ---------------------------------------------
@@ -130,8 +133,6 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
     await queryRunner.query(`
             REVOKE ALL ON TABLE "users", "auth_sessions", "refresh_tokens", "auth_action_tokens" FROM PUBLIC
         `);
-    // Os papéis podem não existir fora do Supabase; o bloco condicional mantém
-    // a migration portável sem abrir acesso quando eles estão presentes.
     await queryRunner.query(`
             DO $$
             BEGIN
@@ -148,10 +149,10 @@ export class CreateAuthTables1787761623204 implements MigrationInterface {
 
   // ---------------------------------------------
   // Remoção da estrutura de autenticação
+  // Chaves, índices e tabelas saem em ordem inversa da criação, para não
+  // deixar nenhuma dependência apontando para um objeto já removido.
   // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Chaves, índices e tabelas saem em ordem inversa para não deixar nenhuma
-    // dependência apontando para um objeto já removido.
     await queryRunner.query(`
             ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_6077443266dc1dde0ac43b6f727"
         `);

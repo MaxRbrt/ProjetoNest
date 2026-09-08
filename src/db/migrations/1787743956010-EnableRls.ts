@@ -5,6 +5,8 @@ export class EnableRls1787743956010 implements MigrationInterface {
 
   // ---------------------------------------------
   // Ativação de segurança em nível de linha
+  // Sem políticas liberando acesso, o RLS bloqueia os papéis da API pública do
+  // Supabase; o REVOKE reforça que eles também não recebem privilégios diretos.
   // ---------------------------------------------
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -18,8 +20,6 @@ export class EnableRls1787743956010 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "migrations" ENABLE ROW LEVEL SECURITY`,
     );
-    // Sem políticas liberando acesso, o RLS bloqueia os papéis da API pública;
-    // o REVOKE reforça que eles também não recebem privilégios diretos.
     await queryRunner.query(
       `REVOKE ALL ON "categories", "products", "orders", "order_items", "migrations" FROM anon, authenticated`,
     );

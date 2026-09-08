@@ -11,7 +11,7 @@ terceirizar para serviços que escondam o funcionamento.
 
 ## Estado atual
 
-Backend com o núcleo completo. Última atualização: 2026-08-28.
+Backend com o núcleo completo. Última atualização: 2026-09-08.
 
 | Área | Estado |
 |---|---|
@@ -26,6 +26,17 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 ## Decisões que não são óbvias no código
 
 - **JWT manual em vez de Supabase Auth** — o objetivo é aprender o mecanismo de sessão por dentro.
+- **Dois provedores de email, escolhidos por `EMAIL_PROVIDER`.** O Resend em domínio de teste
+  (`onboarding@resend.dev`) só entrega para o dono da conta e responde `403` para qualquer outro
+  destinatário — o que torna impossível testar cadastro sem verificar um domínio próprio. Com
+  `EMAIL_PROVIDER=file`, `FileEmailService` grava o HTML em `.emails-dev/` e escreve o link no log.
+  Esse link é credencial: a validação de ambiente **recusa o boot** se o provedor de arquivo for
+  combinado com `NODE_ENV=production`, e a pasta está no `.gitignore`. A montagem da mensagem vive
+  em `email-content.ts`, compartilhada pelos dois — trocar o transporte não duplica o template.
+- **O erro do Resend é registrado em log, mas nunca devolvido ao usuário.** A resposta é sempre
+  `503` com mensagem genérica; sem o log, uma rejeição de política chega indistinguível de queda de
+  rede, e foi exatamente isso que obrigou a escrever um script de diagnóstico avulso em 2026-09-04.
+  O log recebe nome e mensagem do erro — nunca a chave, o token ou o link.
 - **Pedido alheio devolve 404, não 403.** Um 403 confirmaria que o pedido existe e, com ids
   sequenciais, permitiria enumerar o volume de pedidos de terceiros. Vale para `GET /orders/:id` e
   para `PATCH /orders/:id/status`.
@@ -57,6 +68,14 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
   um `OFFSET` impraticável que responde erro interno em vez de 400.
 - **Locks são pedidos em ordem crescente de `productId`**, tanto na criação quanto no estorno do
   cancelamento. Ordens opostas travariam em deadlock quando as duas operações rodam em paralelo.
+- **`TypeOrmModule` usa `forRootAsync` com `ConfigService`, não `forRoot` direto.** Antes, o registro
+  importava a constante `dataSourceOptions` de `db/data-source.ts`, avaliada na importação do módulo
+  — antes do Nest sequer iniciar, antes de `ConfigModule` rodar `validateEnvironment`. Confirmado por
+  execução real: com `DATABASE_URL` ausente, a aplicação quebrava com stack trace cru do Node e
+  ignorava qualquer outra variável quebrada (ex.: `JWT_SECRET` curto), violando a promessa do próprio
+  README de falhar listando todos os problemas de uma vez. `data-source.ts` e `seed-admin.ts` (CLI)
+  continuam usando o caminho eager — falha rápida com mensagem curta é o comportamento certo para uma
+  ferramenta de linha de comando, não para o boot da aplicação.
 
 ## Dívidas conhecidas (decisões conscientes, não esquecimento)
 
@@ -73,12 +92,75 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
    escondido no serviço, cinco corridas de sessão no frontend e um travamento sob StrictMode —
    nenhum deles visível em teste manual. Se o projeto voltar a evoluir nessas áreas, vale restaurar
    ao menos os testes de `auth`. É a dívida mais relevante da lista.
-2. **Dinheiro em ponto flutuante.** `Product.price`, `Order.total` e `OrderItem.unitPrice` usam
-   `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
+2. **Dinheiro em ponto flutuante.** `Produto.preco`, `Pedido.total` e `ItemDoPedido.precoUnitario`
+   usam `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
    quebraria todo cálculo de total, comparação de estoque e testes. Merece subprojeto próprio.
-3. **TOCTOU nas checagens de dependência.** Em `products.service` e `categories.service`, `count` e
-   `remove` não são atômicos. A FK protege o dado, mas o erro `23503` viraria 500 em vez de 409.
+3. **TOCTOU nas checagens de dependência.** Em `produtos.service` e `categorias.service`, `count` e
+   `remover` não são atômicos. A FK protege o dado, mas o erro `23503` viraria 500 em vez de 409.
 4. **Sem carrinho, pagamento, endereço, frete, cupom ou avaliação** — fora de escopo por decisão.
+
+## Refatoração PT-BR — 2026-09-04
+
+Backend inteiro (71 arquivos, migrations excluídas de propósito) e o frontend (`projeto-test-web`)
+tiveram nomes de arquivo, classe, método, variável, propriedade de entidade e propriedade de DTO
+traduzidos para português. Rotas HTTP (`/auth`, `/products`, `/categories`, `/orders`), nomes de
+tabela (`@Entity('products')` etc.) e valores de enum já persistidos (`ADMIN`, `PENDENTE`...) ficaram
+intocados — mudar qualquer um deles exigiria migração de schema ou de dados. Migrations preservam o
+nome de classe original: o TypeORM grava esse nome na tabela `migrations`, renomear faria ele achar
+que a migration nunca rodou.
+
+**O contrato HTTP mudou.** Toda propriedade de entidade e DTO virou PT-BR — o JSON que a API devolve
+e espera também mudou (`price`→`preco`, `categoryId`→`categoriaId`, `page`→`pagina`, `data`→`dados`,
+`role`→`papel`, etc.). O frontend foi atualizado na mesma leva. Qualquer cliente externo desta API
+(script, Postman salvo, outro frontend) quebra até ser atualizado — não é acidente, é o objetivo da
+mudança.
+
+**Dois bugs reais só apareceram testando contra o banco de verdade, não no `tsc`:**
+
+1. **`@Index(['userId', ...])` em array de propriedade não acompanha o rename da propriedade.**
+   O TypeORM valida esse array contra os nomes de propriedade da classe, não contra o `name:` da
+   coluna — renomear a propriedade sem atualizar o array quebra o boot (`Index contains column
+   that is missing in the entity`). Afetou `SessaoDeAutenticacao`, `TokenDeRenovacao`,
+   `TokenDeAcao`. O `tsc` não pega isso: o array é `string[]`, não checado contra o shape da
+   entidade.
+2. **Passport grava o usuário autenticado em `request.user`, nome fixo do framework, não
+   configurável sem opção extra.** A varredura de rename trocou `request.user` por
+   `request.usuario` em `GuardaDePapel`, `UsuarioAtual` (decorator) e `RequisicaoAutenticada`
+   (controller) — isso silenciosamente quebrava **toda** rota que dependesse de usuário
+   autenticado (inclusive `/orders` inteiro, sem relação com papel), porque `request.usuario`
+   nunca existia. `tsc` não pega: o tipo do `getRequest<T>()` é o `T` que o próprio código
+   declara, então declarar `{ usuario: UsuarioPublico }` "prova" a si mesmo. Só apareceu testando
+   login + rota protegida de verdade. Ponto de atenção permanente: **nunca renomear a propriedade
+   que armazena o resultado de `PassportStrategy.validate()`** — o `UsuarioPublico` retornado pode
+   ter qualquer nome de campo em PT-BR, mas o campo do `Request` em si (`request.user`) é do
+   framework.
+
+Também corrigidos nesta refatoração: `package.json`'s `seed:admin` script apontava para o arquivo
+antigo `seed-admin.ts` (renomeado para `promover-admin.ts`) — quebrado até a verificação end-to-end
+rodar o comando de verdade; um `createQueryBuilder('user')` com alias `'user'` mas `.where`/`.addSelect`
+referenciando `'usuario.'` (a varredura de rename trocou dentro da string SQL, alias e referência
+ficaram desalinhados); dois `manager.create(Entidade, { chaveAntiga: valor })` com chave de objeto
+literal desalinhada da propriedade renomeada (`passwordHash`/`expiresAt`/`items` como chave, gravando
+`null` ou nada em produção — `DeepPartial<T>` do TypeORM não força checagem de excesso de propriedade
+em todos os casos); um `b` sobrando em `criarOpcoesDaFonteDeDadosb` (erro de digitação num `sed` que
+usei na própria refatoração, inofensivo porque os 3 pontos de uso tinham o mesmo erro, mas feio).
+
+**Achados do Codex em 2026-09-08** (revisão adversarial pendente desde a sessão da refatoração —
+Codex ficou sem crédito a sessão inteira; rodada de novo dias depois, `codex exec review
+--uncommitted`, achados pela própria exploração do agente antes do veredito formal, timeout de 280s
+não foi suficiente para ele terminar a leitura completa): `package.json`'s script `typeorm` ainda
+apontava para `src/db/data-source.ts` (renomeado para `fonte-de-dados.ts`) — quebrava
+`migration:generate`/`migration:run`/`migration:revert`/`migration:show`, todo o fluxo de CLI de
+migration; `README.md` documentava o contrato antigo em inglês (`?page=1&limit=20`,
+`{"data":[],"page":1,"limit":20}`, `?categoryId=`, `?name=`, `role`) — a seção "Endpoints" nunca foi
+atualizada junto com o resto da refatoração. Ambos corrigidos e `npm run typeorm -- migration:show`
+confirmado funcionando (as 11 migrations aparecem `[X]`, provando que a preservação de nome de classe
+funcionou de verdade).
+
+Verificação: suite completa de `curl` contra o banco real do Supabase (mesmo usado no
+desenvolvimento) — registro, verificação por `.emails-dev/`, login, `GET /auth/me`, criar/editar
+categoria e produto como ADMIN, criar pedido, transição de situação PENDENTE→PAGO→CANCELADO, os dois
+409 de conflito de dependência. Todos bateram com o contrato PT-BR documentado acima.
 
 ## Convenções
 
@@ -97,6 +179,19 @@ Backend com o núcleo completo. Última atualização: 2026-08-28.
 
   Bloco só com título também vale, quando a seção se explica. **Nada de comentário solto no meio do
   corpo da função** — a explicação inteira vai uma vez só no bloco do topo, e o corpo roda limpo.
+
+  Esta regra estava escrita e mesmo assim foi violada em 28 pontos de 14 arquivos, corrigidos em
+  2026-09-04. Antes de fechar qualquer mudança, rodar a varredura — ela lista todo `//` que não
+  está dentro de uma caixa, e o resultado precisa vir vazio:
+
+  ```bash
+  find src -name "*.ts" | while read -r f; do
+  awk -v F="$f" '{t=$0; sub(/^[ \t]+/,"",t)}
+    t ~ /^\/\/ *-{3,} *$/ { inbox = !inbox; next }
+    inbox { next }
+    t ~ /^\/\// { print F ":" NR ": " t }' "$f"
+  done
+  ```
 - **Pasta só existe quando agrupa mais de um arquivo.** Reorganização de 2026-08-31: uma pasta
   `entities/` com uma única entidade some e o arquivo sobe para a raiz do módulo (`categorias`,
   `produtos`, `usuarios`); onde há coleção real, a pasta fica (`auth/entities` com 3,

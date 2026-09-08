@@ -31,7 +31,22 @@ enxerga e altera os próprios pedidos.
 
 - Node.js 20+
 - Um banco PostgreSQL (o projeto foi desenvolvido contra Supabase)
-- Uma conta no [Resend](https://resend.com) para envio dos emails de verificação e recuperação
+- Uma conta no [Resend](https://resend.com) para envio dos emails de verificação e recuperação —
+  opcional em desenvolvimento, ver abaixo
+
+### Emails em desenvolvimento
+
+O Resend em domínio de teste (`onboarding@resend.dev`) só entrega para o email dono da conta;
+qualquer outro destinatário volta `403`. Para testar cadastro com um email qualquer sem verificar um
+domínio próprio, use o provedor de arquivo:
+
+```bash
+EMAIL_PROVIDER=file
+```
+
+O email deixa de ser enviado e passa a ser gravado em `.emails-dev/` (ignorada pelo git), com o link
+de verificação também escrito no log da aplicação. Como esse link é credencial, a validação de
+ambiente **recusa o boot** se `EMAIL_PROVIDER=file` for combinado com `NODE_ENV=production`.
 
 ## Como rodar
 
@@ -56,10 +71,12 @@ de um por inicialização.
 | `JWT_SECRET` | sim | mínimo de 32 bytes; placeholders são rejeitados |
 | `JWT_ISSUER` | sim | emissor declarado no token |
 | `JWT_AUDIENCE` | sim | audiência esperada do token |
-| `RESEND_API_KEY` | sim | precisa começar com `re_` |
+| `RESEND_API_KEY` | condicional | obrigatória com `EMAIL_PROVIDER=resend`; precisa começar com `re_` |
 | `EMAIL_FROM` | sim | remetente dos emails transacionais |
+| `EMAIL_PROVIDER` | não | `resend` (padrão) ou `file`; `file` é recusado em produção |
 | `FRONTEND_URL` | sim | origem liberada no CORS; exige HTTPS em produção |
 | `NODE_ENV` | não | `development`, `test` ou `production` |
+| `PORT` | não | padrão `3000`; inteiro positivo, validado no boot |
 | `TEST_DATABASE_URL` | não | banco isolado para testes; precisa ser diferente de `DATABASE_URL` |
 | `HIBP_API_URL` | não | padrão `https://api.pwnedpasswords.com` |
 | `HIBP_TIMEOUT_MS` | não | padrão `3000` |
@@ -67,7 +84,7 @@ de um por inicialização.
 
 ### Criando um administrador
 
-A API nunca aceita `role` no cadastro. Para promover um usuário já registrado:
+A API nunca aceita `papel` no cadastro. Para promover um usuário já registrado:
 
 ```bash
 npm run seed:admin -- usuario@example.com
@@ -108,13 +125,13 @@ Documentação completa e navegável em `/docs` (desligada quando `NODE_ENV=prod
 
 ### Paginação
 
-As listagens aceitam `?page=1&limit=20` (limite máximo de 100) e devolvem um envelope:
+As listagens aceitam `?pagina=1&limite=20` (limite máximo de 100) e devolvem um envelope:
 
 ```json
-{ "data": [], "total": 137, "page": 1, "limit": 20 }
+{ "dados": [], "total": 137, "pagina": 1, "limite": 20 }
 ```
 
-`GET /products` aceita também `?categoryId=` e `?name=` (busca parcial, sem diferenciar maiúsculas).
+`GET /products` aceita também `?categoriaId=` e `?nome=` (busca parcial, sem diferenciar maiúsculas).
 
 ### Idempotência na criação de pedido
 
@@ -128,7 +145,7 @@ devolve o pedido já criado, em vez de duplicar; a mesma chave com um carrinho d
   com ids sequenciais, permitiria descobrir o volume de pedidos de terceiros.
 - **Cadastro e recuperação de senha respondem sempre a mesma mensagem genérica**, independentemente
   de o email existir, para não permitir enumeração de contas.
-- **`role` não é aceito no corpo de nenhuma requisição.** O `ValidationPipe` global usa
+- **`papel` não é aceito no corpo de nenhuma requisição.** O `ValidationPipe` global usa
   `forbidNonWhitelisted`, então enviar o campo resulta em `400`.
 - **Migrations versionadas com `synchronize` desligado.** O schema nunca muda sozinho a partir das
   entidades.

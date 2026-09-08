@@ -32,10 +32,10 @@ export class CreateOrders1787741065822 implements MigrationInterface {
 
   // ---------------------------------------------
   // Reversão de pedidos e itens
+  // Dependências são removidas na ordem inversa da criação, para liberar as
+  // tabelas referenciadas antes de removê-las.
   // ---------------------------------------------
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Dependências são removidas na ordem inversa da criação para liberar as
-    // tabelas referenciadas.
     await queryRunner.query(
       `ALTER TABLE "order_items" DROP CONSTRAINT "FK_cdb99c05982d5191ac8465ac010"`,
     );
