@@ -84,12 +84,21 @@ describe('PedidosService — congelamento de endereço (integração)', () => {
     });
 
     const pedido = await pedidosService.criar(
-      { enderecoId: endereco.id, itens: [{ produtoId: produto.id, quantidade: 1 }] },
+      {
+        enderecoId: endereco.id,
+        modalidadeDeFrete: 'PAC',
+        itens: [{ produtoId: produto.id, quantidade: 1 }],
+      },
       usuarioPublico,
     );
 
     expect(pedido.enderecoLogradouro).toBe('Av. Paulista');
     expect(pedido.enderecoCidade).toBe('São Paulo');
+    expect(pedido.modalidadeDeFrete).toBe('PAC');
+    expect(pedido.freteEmCentavos).toBeGreaterThan(0);
+    expect(pedido.totalEmCentavos).toBe(
+      pedido.subtotalEmCentavos + pedido.freteEmCentavos,
+    );
 
     // edita o endereço depois de já ter comprado com ele
     await enderecosService.atualizar(endereco.id, usuario.id, {
@@ -133,6 +142,7 @@ describe('PedidosService — congelamento de endereço (integração)', () => {
       pedidosService.criar(
         {
           enderecoId: enderecoDeOutro.id,
+          modalidadeDeFrete: 'PAC',
           itens: [{ produtoId: produto.id, quantidade: 1 }],
         },
         usuarioPublico,
@@ -171,6 +181,7 @@ describe('PedidosService — congelamento de endereço (integração)', () => {
     await pedidosService.criar(
       {
         enderecoId: enderecoUm.id,
+        modalidadeDeFrete: 'PAC',
         itens: [{ produtoId: produto.id, quantidade: 1 }],
       },
       usuarioPublico,
@@ -181,11 +192,121 @@ describe('PedidosService — congelamento de endereço (integração)', () => {
       pedidosService.criar(
         {
           enderecoId: enderecoDois.id,
+          modalidadeDeFrete: 'PAC',
           itens: [{ produtoId: produto.id, quantidade: 1 }],
         },
         usuarioPublico,
         'chave-repetida',
       ),
     ).rejects.toThrow(/payload diferente/);
+  });
+
+  it('reenvio com a mesma Idempotency-Key mas modalidade de frete diferente é 409, não silencioso', async () => {
+    const endereco = await enderecosService.criar(usuario.id, {
+      apelido: 'Casa',
+      destinatario: 'Fulano',
+      cep: '01310100',
+      logradouro: 'Rua Um',
+      numero: '1',
+      bairro: 'Bairro',
+      cidade: 'São Paulo',
+      uf: 'SP',
+    });
+
+    await pedidosService.criar(
+      {
+        enderecoId: endereco.id,
+        modalidadeDeFrete: 'PAC',
+        itens: [{ produtoId: produto.id, quantidade: 1 }],
+      },
+      usuarioPublico,
+      'chave-repetida-frete',
+    );
+
+    await expect(
+      pedidosService.criar(
+        {
+          enderecoId: endereco.id,
+          modalidadeDeFrete: 'SEDEX',
+          itens: [{ produtoId: produto.id, quantidade: 1 }],
+        },
+        usuarioPublico,
+        'chave-repetida-frete',
+      ),
+    ).rejects.toThrow(/payload diferente/);
+  });
+
+  it('frete varia por região e por quantidade de itens, nunca aceita valor do cliente', async () => {
+    const enderecoSudeste = await enderecosService.criar(usuario.id, {
+      apelido: 'SP',
+      destinatario: 'Fulano',
+      cep: '01310100',
+      logradouro: 'Rua Um',
+      numero: '1',
+      bairro: 'Bairro',
+      cidade: 'São Paulo',
+      uf: 'SP',
+    });
+    const enderecoNorte = await enderecosService.criar(usuario.id, {
+      apelido: 'AM',
+      destinatario: 'Fulano',
+      cep: '69000000',
+      logradouro: 'Rua Dois',
+      numero: '2',
+      bairro: 'Bairro',
+      cidade: 'Manaus',
+      uf: 'AM',
+    });
+
+    const pedidoSudeste = await pedidosService.criar(
+      {
+        enderecoId: enderecoSudeste.id,
+        modalidadeDeFrete: 'PAC',
+        itens: [{ produtoId: produto.id, quantidade: 1 }],
+      },
+      usuarioPublico,
+    );
+    const pedidoNorte = await pedidosService.criar(
+      {
+        enderecoId: enderecoNorte.id,
+        modalidadeDeFrete: 'PAC',
+        itens: [{ produtoId: produto.id, quantidade: 1 }],
+      },
+      usuarioPublico,
+    );
+
+    // frete para o Norte é mais caro que para o Sudeste — região mais distante
+    expect(pedidoNorte.freteEmCentavos).toBeGreaterThan(
+      pedidoSudeste.freteEmCentavos,
+    );
+  });
+
+  it('nenhum "freteEmCentavos" enviado pelo cliente é lido — o serviço sempre recalcula', async () => {
+    const endereco = await enderecosService.criar(usuario.id, {
+      apelido: 'Casa',
+      destinatario: 'Fulano',
+      cep: '01310100',
+      logradouro: 'Rua Um',
+      numero: '1',
+      bairro: 'Bairro',
+      cidade: 'São Paulo',
+      uf: 'SP',
+    });
+
+    // simula um payload adulterado: mesmo com um campo extra de custo, o DTO
+    // real (CriarPedidoDto) não declara essa propriedade, e o service só lê
+    // dto.enderecoId/dto.modalidadeDeFrete/dto.itens — o valor forjado nunca
+    // chega a ser usado no cálculo.
+    const pedido = await pedidosService.criar(
+      {
+        enderecoId: endereco.id,
+        modalidadeDeFrete: 'PAC',
+        itens: [{ produtoId: produto.id, quantidade: 1 }],
+        freteEmCentavos: 1,
+      } as never,
+      usuarioPublico,
+    );
+
+    expect(pedido.freteEmCentavos).toBeGreaterThan(1);
   });
 });
