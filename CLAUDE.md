@@ -21,7 +21,8 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento, listagem com filtro opcional por `situacao` |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
-| Testes | Módulo `auth` restaurado em 2026-09-08 (47 testes unitários, `npm test`). Demais módulos sem cobertura — ver dívidas |
+| Dinheiro | **Centavos inteiros** (`priceInCents`, `unitPriceInCents`, `totalInCents`). O `float` saiu em 2026-09-09 — ver seção própria |
+| Testes | `auth` com 47 unitários (`npm test`) + 11 de integração contra Postgres real em container (`npm run test:integration`). Demais módulos sem cobertura — ver dívidas |
 
 ## Decisões que não são óbvias no código
 
@@ -77,6 +78,63 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
   continuam usando o caminho eager — falha rápida com mensagem curta é o comportamento certo para uma
   ferramenta de linha de comando, não para o boot da aplicação.
 
+## Infraestrutura de teste de integração — 2026-09-09
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 0.
+
+`docker-compose.test.yml` sobe um Postgres 16 efêmero (tmpfs, porta 5433) só para a suíte de
+integração. `npm run test:db:up` levanta, `npm run test:integration` roda, `npm run test:db:down`
+derruba. `TEST_DATABASE_URL` aponta para ele e a trava que já existia em
+`src/db/opcoes-do-banco.ts` (recusa a URL ausente ou igual a `DATABASE_URL`) é o que impede um
+teste de truncar o banco de desenvolvimento.
+
+**Descoberta que quase impediu a suíte de rodar:** a migration `EnableRls` faz
+`REVOKE ... FROM anon, authenticated`. Esses papéis existem em qualquer projeto Supabase, mas não
+num Postgres limpo — a migration quebrava com "role anon does not exist". A saída foi criar os dois
+papéis no container (`test/integracao/init-papeis-supabase.sql`) em vez de tornar a migration
+tolerante: assim o teste executa exatamente a mesma migration que roda em produção, RLS incluído,
+em vez de um caminho alternativo que esconderia erro real.
+
+Postgres **16** é obrigatório, não preferência: `gen_random_uuid()` só entrou no núcleo no 13, e as
+entidades usam `@PrimaryGeneratedColumn('uuid')`.
+
+## Dinheiro em centavos inteiros — 2026-09-09
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 1. Fecha a dívida 2.
+
+`float` saiu. O substituto **não** é `numeric(12,2)`: o TypeORM devolve `numeric` como string, o que
+quebraria todo cálculo — é exatamente por isso que a dívida ficou parada tanto tempo. Entrou
+`integer` de centavos, que resolve as duas coisas de uma vez e é como todo provedor de pagamento
+representa dinheiro (`amount: 1990`), então a fase de pagamento encaixa sem conversão.
+
+**Contrato HTTP mudou** (`preco` → `precoEmCentavos`, `total` → `totalEmCentavos`,
+`precoUnitario` → `precoUnitarioEmCentavos`) e as colunas foram renomeadas junto
+(`price` → `priceInCents`, etc.). Renomear a coluna foi decisão consciente e contraria a regra geral
+do projeto de não renomear coluna: o que mudou aqui não foi o idioma, foi a **unidade**. Uma coluna
+`price` com 1990 dentro faria quem consulta o banco direto ler mil novecentos e noventa reais.
+
+Migration `1787900000006-MoneyToCents`, reversível. A conversão passa por `numeric` antes de
+arredondar (`ROUND(("price")::numeric * 100)`): em float, `19.9 * 100` dá `1989.9999999999998`, e
+truncar tiraria um centavo de cada produto.
+
+**Duas coisas que só apareceram rodando:**
+
+1. **`integer` não recusa fração — arredonda calado.** O palpite ao escrever o teste era que o banco
+   rejeitaria `19.9` numa coluna inteira. Não rejeita: vira `20`, sem erro. Consequência prática: o
+   `@IsInt` dos DTOs é a **única** defesa contra preço fracionário, não é redundância. Está
+   documentado em `test/integracao/dinheiro.int-spec.ts` para ninguém remover o decorator achando
+   que o banco protege.
+2. **Um produto de teste antigo impedia a migration.** `boundprod3` tinha preço `1e20`, resquício de
+   um teste de limite; convertido para centavos daria `1e22` e estouraria `integer`. Os 9 produtos
+   de teste sem pedido ligado foram removidos com autorização do proprietário antes de migrar.
+   Lição: **olhar os dados antes de rodar migration de conversão** — o problema não aparecia em
+   nenhum teste, só no dado real.
+
+Verificação: 11 testes de integração (incluindo conversão com dado real, `19.90 → 1990`,
+`0.01 → 1`, `1234.56 → 123456`, e a reversão de volta), e clique real conferindo vitrine
+(R$ 99,90), carrinho (3 × R$ 99,90 = R$ 299,70) e pedido criado com `totalInCents` 29970 exato.
+Dado de teste removido do banco ao final.
+
 ## Filtro de status em `GET /orders` — 2026-09-08
 
 Spec: `docs/superpowers/specs/2026-09-08-filtro-status-pedidos-design.md`. Preparação para a futura
@@ -128,7 +186,15 @@ situação mudando para `CANCELADO` na tela, itens permanecendo visíveis, zero 
    atual, não restaurada do git (a sessão nunca roda `git`, e a suíte antiga era pré-refatoração
    PT-BR de qualquer forma).
 
-   **Gap real, apontado por revisão adversarial (Codex) e não corrigido nesta leva:**
+   **Atualização de 2026-09-09: o gap abaixo foi fechado.** `test/integracao/sessoes.int-spec.ts`
+   cobre os três pontos contra Postgres real. Um deles rendeu uma lição: o primeiro teste de
+   concorrência que escrevi (`duas rotações simultâneas, uma vence`) passava **com e sem os locks** —
+   provava a consequência, não o mecanismo. Foi substituído por um caso com duas conexões e barreira
+   explícita: A trava a linha, B fica pendurada 400ms, A commita, B destrava. Esse falha de verdade
+   quando o `pessimistic_write` sai. O caso antigo ficou no arquivo, com comentário dizendo que ele
+   sozinho não prova nada — serve de aviso para quem for escrever o próximo.
+
+   **Gap histórico, apontado por revisão adversarial (Codex) antes de ser fechado:**
    `sessoes.service.spec.ts` usa um `FakeEntityManager` escrito à mão (não TypeORM real) para simular
    `transaction`/`findOne`/`save`/`update`. Isso prova a lógica de decisão (branches, mensagens,
    revogação em memória), mas **não prova**: rollback real de uma transação que lança exceção depois
@@ -149,9 +215,10 @@ situação mudando para `CANCELADO` na tela, itens permanecendo visíveis, zero 
    dentro do próprio `auth`) continuam sem nenhum teste automatizado — os 25 arquivos originais
    (153 testes) seguem recuperáveis do histórico do git, no commit imediatamente anterior à remoção
    de 2026-08-31: `git checkout <commit-anterior> -- "src/**/*.spec.ts" test/`.
-2. **Dinheiro em ponto flutuante.** `Produto.preco`, `Pedido.total` e `ItemDoPedido.precoUnitario`
-   usam `float`. O correto é `numeric(12,2)`, mas o TypeORM devolve `numeric` como **string**, o que
-   quebraria todo cálculo de total, comparação de estoque e testes. Merece subprojeto próprio.
+2. ~~**Dinheiro em ponto flutuante.**~~ **Resolvido em 2026-09-09** — ver a seção "Dinheiro em
+   centavos inteiros". Ficou uma limitação consciente no lugar: `integer` comporta até
+   R$ 21.474.836,47 por valor. Suficiente para este catálogo; se algum dia precisar de mais, a troca
+   é para `bigint`, que o TypeORM devolve como string e exigiria um transformador.
 3. **TOCTOU nas checagens de dependência.** Em `produtos.service` e `categorias.service`, `count` e
    `remover` não são atômicos. A FK protege o dado, mas o erro `23503` viraria 500 em vez de 409.
 4. **Sem carrinho, pagamento, endereço, frete, cupom ou avaliação** — fora de escopo por decisão.
@@ -299,6 +366,9 @@ categoria e produto como ADMIN, criar pedido, transição de situação PENDENTE
 | `npm run format` | Prettier |
 | `npm run migration:run` / `migration:revert` | Migrations |
 | `npm run seed:admin -- <email> --confirm-target=...` | Promove usuário a ADMIN |
+| `npm test` | Testes unitários (Jest) |
+| `npm run test:db:up` / `test:db:down` | Sobe/derruba o Postgres de teste (Docker) |
+| `npm run test:integration` | Testes de integração (exige `test:db:up` antes) |
 
 ## Documentação local (não versionada)
 
