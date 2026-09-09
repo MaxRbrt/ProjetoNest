@@ -27,8 +27,8 @@ export class Pedido {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column('float')
-  total: number;
+  @Column('integer', { name: 'totalInCents' })
+  totalEmCentavos: number;
 
   @CreateDateColumn({ name: 'createdAt' })
   criadoEm: Date;

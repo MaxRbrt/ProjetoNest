@@ -1,13 +1,16 @@
 import {
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
   Min,
 } from 'class-validator';
 
+// ---------------------------------------------
+// Atualização parcial de produto
+// Preço em centavos inteiros pelo mesmo motivo de CriarProdutoDto.
+// ---------------------------------------------
 export class AtualizarProdutoDto {
   @IsOptional()
   @IsString()
@@ -15,9 +18,9 @@ export class AtualizarProdutoDto {
   nome?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @IsPositive()
-  preco?: number;
+  precoEmCentavos?: number;
 
   @IsOptional()
   @IsInt()

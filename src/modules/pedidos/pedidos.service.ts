@@ -341,7 +341,7 @@ export class PedidosService {
     payloadHash: string | null,
   ): Promise<Pedido> {
     return this.repositorioDePedidos.manager.transaction(async (manager) => {
-      let total = 0;
+      let totalEmCentavos = 0;
       const itens: ItemDoPedido[] = [];
 
       const sortedItems = [...dto.itens].sort(
@@ -364,13 +364,13 @@ export class PedidosService {
           );
         }
 
-        total += produto.preco * item.quantidade;
+        totalEmCentavos += produto.precoEmCentavos * item.quantidade;
 
         const itemDoPedido = new ItemDoPedido();
         itemDoPedido.produtoId = item.produtoId;
         itemDoPedido.quantidade = item.quantidade;
         itemDoPedido.nomeDoProduto = produto.nome;
-        itemDoPedido.precoUnitario = produto.preco;
+        itemDoPedido.precoUnitarioEmCentavos = produto.precoEmCentavos;
         itens.push(itemDoPedido);
 
         produto.estoque -= item.quantidade;
@@ -378,7 +378,7 @@ export class PedidosService {
       }
 
       const pedido = manager.create(Pedido, {
-        total,
+        totalEmCentavos,
         itens,
         usuarioId: usuario.id,
         chaveDeIdempotencia: idempotencyKey,

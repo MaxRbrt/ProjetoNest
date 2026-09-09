@@ -49,6 +49,6 @@ export class ItemDoPedido {
   @Column({ type: 'varchar', length: 255, name: 'productName' })
   nomeDoProduto: string;
 
-  @Column('float', { name: 'unitPrice' })
-  precoUnitario: number;
+  @Column('integer', { name: 'unitPriceInCents' })
+  precoUnitarioEmCentavos: number;
 }
