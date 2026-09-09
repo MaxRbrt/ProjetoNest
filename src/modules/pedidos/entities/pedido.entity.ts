@@ -27,6 +27,27 @@ export class Pedido {
   @PrimaryGeneratedColumn()
   id: number;
 
+  // ---------------------------------------------
+  // Composição do total
+  // totalEmCentavos = subtotalEmCentavos + freteEmCentavos, calculado uma vez
+  // na criação e congelado — mudança futura na tabela de frete não pode
+  // alterar o valor de um pedido já pago. subtotal fica column própria (em
+  // vez de recalcular somando itens toda leitura) pelo mesmo motivo de
+  // congelar preço de item: é o valor que o pedido realmente teve, não o que
+  // os itens somariam hoje.
+  // ---------------------------------------------
+  @Column('integer', { name: 'subtotalInCents' })
+  subtotalEmCentavos: number;
+
+  @Column('integer', { name: 'shippingCostInCents' })
+  freteEmCentavos: number;
+
+  @Column({ type: 'varchar', length: 10, name: 'shippingMethod' })
+  modalidadeDeFrete: string;
+
+  @Column({ type: 'integer', name: 'shippingEstimatedDays' })
+  prazoEmDiasUteis: number;
+
   @Column('integer', { name: 'totalInCents' })
   totalEmCentavos: number;
 

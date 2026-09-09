@@ -18,6 +18,10 @@ import { Pedido, SituacaoDoPedido } from './entities/pedido.entity';
 import { ItemDoPedido } from './entities/item-do-pedido.entity';
 import { Produto } from '../produtos/produto.entity';
 import { Endereco } from '../enderecos/endereco.entity';
+import {
+  calcularOpcaoDeFrete,
+  type ModalidadeDeFrete,
+} from '../frete/calculo-de-frete';
 import { Papel } from '../usuarios/usuario.entity';
 import { UsuarioPublico } from '../usuarios/usuarios.service';
 import { CriarPedidoDto, CriarItemDoPedidoDto } from './dto/criar-pedido.dto';
@@ -27,14 +31,17 @@ import { ConsultaDePedidosDto } from './dto/consulta-de-pedidos.dto';
 // ---------------------------------------------
 // Hash do payload para conferência de Idempotency-Key
 // Itens ordenados por productId: o mesmo carrinho gera o mesmo hash
-// independente da ordem em que o cliente enviou os itens no corpo. O
-// enderecoId entra no hash desde que o endereço passou a fazer parte do
-// pedido: sem isso, reenviar a mesma chave com um endereço diferente
-// devolveria silenciosamente o pedido antigo, entregue no lugar errado, em
-// vez de acusar conflito de payload.
+// independente da ordem em que o cliente enviou os itens no corpo. enderecoId
+// e modalidadeDeFrete entram no hash pelo mesmo motivo: qualquer campo que
+// afete o pedido final precisa estar aqui, senão reenviar a mesma chave com
+// um desses campos diferente devolveria silenciosamente o pedido antigo —
+// endereço ou frete errado — em vez de acusar conflito de payload. Foi assim
+// que o esquecimento do enderecoId virou bug real na Fase 2; modalidadeDeFrete
+// entra desde já para não repetir.
 // ---------------------------------------------
 export function hashDoPayloadDoPedido(
   enderecoId: number,
+  modalidadeDeFrete: string,
   itens: CriarItemDoPedidoDto[],
 ): string {
   const normalized = [...itens]
@@ -42,7 +49,7 @@ export function hashDoPayloadDoPedido(
     .map((item) => `${item.produtoId}:${item.quantidade}`)
     .join(',');
   return createHash('sha256')
-    .update(`${enderecoId}|${normalized}`, 'utf8')
+    .update(`${enderecoId}|${modalidadeDeFrete}|${normalized}`, 'utf8')
     .digest('hex');
 }
 
@@ -215,7 +222,7 @@ export class PedidosService {
     exigirProdutosSemRepeticao(dto.itens);
     const idempotencyKey = normalizarChaveDeIdempotencia(rawIdempotencyKey);
     const payloadHash = idempotencyKey
-      ? hashDoPayloadDoPedido(dto.enderecoId, dto.itens)
+      ? hashDoPayloadDoPedido(dto.enderecoId, dto.modalidadeDeFrete, dto.itens)
       : null;
 
     if (idempotencyKey) {
@@ -358,7 +365,8 @@ export class PedidosService {
         throw new NotFoundException(`Endereço ${dto.enderecoId} não encontrado`);
       }
 
-      let totalEmCentavos = 0;
+      let subtotalEmCentavos = 0;
+      let quantidadeDeItens = 0;
       const itens: ItemDoPedido[] = [];
 
       const sortedItems = [...dto.itens].sort(
@@ -381,7 +389,8 @@ export class PedidosService {
           );
         }
 
-        totalEmCentavos += produto.precoEmCentavos * item.quantidade;
+        subtotalEmCentavos += produto.precoEmCentavos * item.quantidade;
+        quantidadeDeItens += item.quantidade;
 
         const itemDoPedido = new ItemDoPedido();
         itemDoPedido.produtoId = item.produtoId;
@@ -394,8 +403,20 @@ export class PedidosService {
         await manager.save(produto);
       }
 
+      // O custo do frete nunca vem do cliente — só a modalidade escolhida.
+      // Recalculado aqui, na criação, com o endereço e a quantidade reais.
+      const opcaoDeFrete = calcularOpcaoDeFrete(
+        endereco.uf,
+        quantidadeDeItens,
+        dto.modalidadeDeFrete as ModalidadeDeFrete,
+      );
+
       const pedido = manager.create(Pedido, {
-        totalEmCentavos,
+        subtotalEmCentavos,
+        freteEmCentavos: opcaoDeFrete.custoEmCentavos,
+        modalidadeDeFrete: opcaoDeFrete.modalidade,
+        prazoEmDiasUteis: opcaoDeFrete.prazoEmDiasUteis,
+        totalEmCentavos: subtotalEmCentavos + opcaoDeFrete.custoEmCentavos,
         itens,
         usuarioId: usuario.id,
         chaveDeIdempotencia: idempotencyKey,

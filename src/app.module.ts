@@ -8,6 +8,7 @@ import { CategoriasModule } from './modules/categorias/categorias.module';
 import { ProdutosModule } from './modules/produtos/produtos.module';
 import { PedidosModule } from './modules/pedidos/pedidos.module';
 import { EnderecosModule } from './modules/enderecos/enderecos.module';
+import { FreteModule } from './modules/frete/frete.module';
 import { criarOpcoesDaFonteDeDados } from './db/opcoes-do-banco';
 import { validarAmbiente } from './config/validacao-de-ambiente';
 import { AutenticacaoModule } from './modules/auth/autenticacao.module';
@@ -54,6 +55,7 @@ import { GuardaDePapel } from './modules/auth/guards/papel.guard';
     ProdutosModule,
     PedidosModule,
     EnderecosModule,
+    FreteModule,
     AutenticacaoModule,
   ],
   controllers: [AppController],
