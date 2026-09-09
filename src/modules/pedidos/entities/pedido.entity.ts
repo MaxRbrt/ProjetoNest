@@ -77,4 +77,45 @@ export class Pedido {
 
   @Column({ type: 'char', length: 64, nullable: true, name: 'payloadHash' })
   hashDoPayload: string | null;
+
+  // ---------------------------------------------
+  // Endereço de entrega, congelado no momento da compra
+  // A referência (enderecoId) fica para rastreabilidade administrativa, mas
+  // quem exibe o pedido lê sempre os campos congelados abaixo, nunca o
+  // endereço vivo — mesma razão de ItemDoPedido congelar nome e preço:
+  // editar o endereço depois não pode reescrever para onde a compra já foi
+  // enviada. ON DELETE SET NULL porque apagar o endereço não pode apagar o
+  // histórico do pedido.
+  // ---------------------------------------------
+  @Column({ type: 'integer', nullable: true, name: 'addressId' })
+  enderecoId: number | null;
+
+  @Column({ type: 'varchar', length: 120, name: 'shippingRecipient' })
+  enderecoDestinatario: string;
+
+  @Column({ type: 'char', length: 8, name: 'shippingCep' })
+  enderecoCep: string;
+
+  @Column({ type: 'varchar', length: 200, name: 'shippingStreet' })
+  enderecoLogradouro: string;
+
+  @Column({ type: 'varchar', length: 20, name: 'shippingNumber' })
+  enderecoNumero: string;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+    name: 'shippingComplement',
+  })
+  enderecoComplemento: string | null;
+
+  @Column({ type: 'varchar', length: 100, name: 'shippingNeighborhood' })
+  enderecoBairro: string;
+
+  @Column({ type: 'varchar', length: 100, name: 'shippingCity' })
+  enderecoCidade: string;
+
+  @Column({ type: 'char', length: 2, name: 'shippingState' })
+  enderecoUf: string;
 }

@@ -17,6 +17,7 @@ import { ConsultaPaginadaDto } from '../../common/dto/consulta-paginada.dto';
 import { Pedido, SituacaoDoPedido } from './entities/pedido.entity';
 import { ItemDoPedido } from './entities/item-do-pedido.entity';
 import { Produto } from '../produtos/produto.entity';
+import { Endereco } from '../enderecos/endereco.entity';
 import { Papel } from '../usuarios/usuario.entity';
 import { UsuarioPublico } from '../usuarios/usuarios.service';
 import { CriarPedidoDto, CriarItemDoPedidoDto } from './dto/criar-pedido.dto';
@@ -26,14 +27,23 @@ import { ConsultaDePedidosDto } from './dto/consulta-de-pedidos.dto';
 // ---------------------------------------------
 // Hash do payload para conferência de Idempotency-Key
 // Itens ordenados por productId: o mesmo carrinho gera o mesmo hash
-// independente da ordem em que o cliente enviou os itens no corpo.
+// independente da ordem em que o cliente enviou os itens no corpo. O
+// enderecoId entra no hash desde que o endereço passou a fazer parte do
+// pedido: sem isso, reenviar a mesma chave com um endereço diferente
+// devolveria silenciosamente o pedido antigo, entregue no lugar errado, em
+// vez de acusar conflito de payload.
 // ---------------------------------------------
-export function hashDoPayloadDoPedido(itens: CriarItemDoPedidoDto[]): string {
+export function hashDoPayloadDoPedido(
+  enderecoId: number,
+  itens: CriarItemDoPedidoDto[],
+): string {
   const normalized = [...itens]
     .sort((a, b) => a.produtoId - b.produtoId)
     .map((item) => `${item.produtoId}:${item.quantidade}`)
     .join(',');
-  return createHash('sha256').update(normalized, 'utf8').digest('hex');
+  return createHash('sha256')
+    .update(`${enderecoId}|${normalized}`, 'utf8')
+    .digest('hex');
 }
 
 // ---------------------------------------------
@@ -205,7 +215,7 @@ export class PedidosService {
     exigirProdutosSemRepeticao(dto.itens);
     const idempotencyKey = normalizarChaveDeIdempotencia(rawIdempotencyKey);
     const payloadHash = idempotencyKey
-      ? hashDoPayloadDoPedido(dto.itens)
+      ? hashDoPayloadDoPedido(dto.enderecoId, dto.itens)
       : null;
 
     if (idempotencyKey) {
@@ -341,6 +351,13 @@ export class PedidosService {
     payloadHash: string | null,
   ): Promise<Pedido> {
     return this.repositorioDePedidos.manager.transaction(async (manager) => {
+      const endereco = await manager.findOne(Endereco, {
+        where: { id: dto.enderecoId, usuarioId: usuario.id },
+      });
+      if (!endereco) {
+        throw new NotFoundException(`Endereço ${dto.enderecoId} não encontrado`);
+      }
+
       let totalEmCentavos = 0;
       const itens: ItemDoPedido[] = [];
 
@@ -383,6 +400,15 @@ export class PedidosService {
         usuarioId: usuario.id,
         chaveDeIdempotencia: idempotencyKey,
         hashDoPayload: payloadHash,
+        enderecoId: endereco.id,
+        enderecoDestinatario: endereco.destinatario,
+        enderecoCep: endereco.cep,
+        enderecoLogradouro: endereco.logradouro,
+        enderecoNumero: endereco.numero,
+        enderecoComplemento: endereco.complemento,
+        enderecoBairro: endereco.bairro,
+        enderecoCidade: endereco.cidade,
+        enderecoUf: endereco.uf,
       });
       return manager.save(pedido);
     });
