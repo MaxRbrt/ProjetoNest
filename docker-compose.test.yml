@@ -1,0 +1,34 @@
+# ---------------------------------------------
+# Postgres efêmero para os testes de integração
+# Isolado do banco de desenvolvimento no Supabase de propósito: teste de
+# integração trunca tabelas entre casos, e apontar isso para o banco real
+# destruiria dado. A trava que impede esse acidente vive em
+# src/db/opcoes-do-banco.ts (recusa TEST_DATABASE_URL ausente ou igual a
+# DATABASE_URL); este arquivo é a outra metade — o banco descartável.
+#
+# Postgres 16 é obrigatório, não preferência: gen_random_uuid() só existe no
+# núcleo a partir do 13, e as entidades usam @PrimaryGeneratedColumn('uuid')
+# com uuidExtension 'pgcrypto'. Em versão anterior faltaria a função.
+#
+# tmpfs no diretório de dados: o banco vive em memória e some quando o
+# container para. Cada execução da suíte começa limpa, sem volume acumulando.
+# ---------------------------------------------
+services:
+  postgres-teste:
+    image: postgres:16-alpine
+    container_name: projeto-test-postgres-teste
+    environment:
+      POSTGRES_USER: teste
+      POSTGRES_PASSWORD: teste
+      POSTGRES_DB: projeto_test_teste
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./test/integracao/init-papeis-supabase.sql:/docker-entrypoint-initdb.d/init-papeis-supabase.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U teste -d projeto_test_teste']
+      interval: 2s
+      timeout: 3s
+      retries: 20
