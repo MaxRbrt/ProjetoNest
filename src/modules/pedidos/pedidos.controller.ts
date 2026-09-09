@@ -12,7 +12,7 @@ import {
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Paginado } from '../../common/dto/paginado';
 import { ApiPaginatedResponse } from '../../common/dto/resposta-paginada.dto';
-import { ConsultaPaginadaDto } from '../../common/dto/consulta-paginada.dto';
+import { ConsultaDePedidosDto } from './dto/consulta-de-pedidos.dto';
 import { UsuarioAtual } from '../../decorators/usuario-atual.decorator';
 import type { UsuarioPublico } from '../usuarios/usuarios.service';
 import { PedidosService } from './pedidos.service';
@@ -32,7 +32,7 @@ export class PedidosController {
   @ApiPaginatedResponse(Pedido)
   listar(
     @UsuarioAtual() usuario: UsuarioPublico,
-    @Query() query: ConsultaPaginadaDto,
+    @Query() query: ConsultaDePedidosDto,
   ): Promise<Paginado<Pedido>> {
     return this.pedidosService.listar(usuario, query);
   }

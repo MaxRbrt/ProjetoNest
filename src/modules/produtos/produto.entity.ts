@@ -15,6 +15,11 @@ import { ItemDoPedido } from '../pedidos/entities/item-do-pedido.entity';
 // @Column({ name }): o banco já existe com esses nomes, e renomear coluna
 // exigiria migration de ALTER TABLE sem ganho nenhum — quem lê o código é
 // pessoa, quem lê a coluna é o Postgres.
+//
+// A exceção é o preço: ali a coluna foi renomeada junto com a propriedade
+// (price -> priceInCents) porque o que mudou não foi o idioma, foi a
+// unidade. Uma coluna chamada "price" guardando 1990 faria quem consulta o
+// banco direto ler mil novecentos e noventa reais.
 // ---------------------------------------------
 @Entity('products')
 export class Produto {
@@ -27,8 +32,8 @@ export class Produto {
   @Column({ name: 'name' })
   nome: string;
 
-  @Column('float', { name: 'price' })
-  preco: number;
+  @Column('integer', { name: 'priceInCents' })
+  precoEmCentavos: number;
 
   @Column({ name: 'stock' })
   estoque: number;
