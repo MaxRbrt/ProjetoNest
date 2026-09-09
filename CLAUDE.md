@@ -23,7 +23,8 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
 | Dinheiro | **Centavos inteiros** (`priceInCents`, `unitPriceInCents`, `totalInCents`). O `float` saiu em 2026-09-09 — ver seção própria |
 | Endereços | Módulo `enderecos` completo (CRUD, um principal por usuário) + snapshot congelado no pedido — ver seção própria, 2026-09-09 |
-| Testes | `auth` com 47 unitários (`npm test`) + 21 de integração contra Postgres real em container (`npm run test:integration`, cobre sessões, dinheiro e endereços). Demais módulos sem cobertura — ver dívidas |
+| Frete | Módulo `frete`, cálculo **simulado** determinístico por região + quantidade, custo sempre recalculado no servidor na criação do pedido — ver seção própria, 2026-09-09 |
+| Testes | 54 unitários (`npm test`: 47 de `auth` + 7 de cálculo de frete) + 24 de integração contra Postgres real em container (`npm run test:integration`, cobre sessões, dinheiro, endereços e frete/idempotência). Demais módulos sem cobertura — ver dívidas |
 
 ## Decisões que não são óbvias no código
 
@@ -185,6 +186,50 @@ Validação: 21 testes de integração (10 novos: 7 de `enderecos`, 3 de congela
 pedidos), `tsc` limpo, clique real completo (cadastro de endereço → checkout com seleção de
 endereço → pedido criado com endereço congelado → edição do endereço → pedido continua mostrando o
 endereço antigo). Dado de teste removido do banco ao final.
+
+## Frete — 2026-09-09
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 3. Módulo do zero.
+
+`POST /shipping/quote { enderecoId, itens }` devolve `[{ modalidade, custoEmCentavos,
+prazoEmDiasUteis }]` para `PAC` e `SEDEX`. **Cálculo simulado e determinístico**
+(`src/modules/frete/calculo-de-frete.ts`) por região da UF de destino (Norte/Nordeste/
+Centro-Oeste/Sudeste/Sul) e quantidade total de itens — não é integração com transportadora, não
+há peso/volume real. Mesmo endereço e mesma quantidade sempre devolvem o mesmo valor.
+
+`POST /orders` passa a exigir `modalidadeDeFrete` (só `'PAC'` ou `'SEDEX'`, validado por `@IsIn` no
+DTO). **Decisão de design deliberada, mais forte que "recalcular e comparar":** o cliente nunca
+envia o custo do frete, só a modalidade escolhida — `CriarPedidoDto` não declara nenhum campo de
+custo, e o `ValidationPipe` (`whitelist: true`) descartaria qualquer um que tentasse mandar. O
+serviço recalcula o custo a partir do endereço e da quantidade real de itens toda vez, na própria
+transação de criação. Não existe payload de frete para forjar porque não existe campo de frete no
+payload — comparar um valor enviado contra o recalculado seria mais complexo e não mais seguro.
+
+`Pedido` ganha `subtotalEmCentavos`, `freteEmCentavos`, `modalidadeDeFrete`, `prazoEmDiasUteis`;
+`totalEmCentavos` passa a ser subtotal + frete, os dois congelados na criação (mudança futura na
+tabela de frete não pode alterar pedido já pago).
+
+**Achado real: idempotência precisava do `modalidadeDeFrete` no hash, e desta vez entrou desde o
+início** — a Fase 2 esqueceu o `enderecoId` e só descobriu com teste quebrando; aqui o hash já
+nasceu incluindo os dois (`hashDoPayloadDoPedido(enderecoId, modalidadeDeFrete, itens)`). Confirmado
+mesmo assim quebrando de propósito antes de aceitar como correto: sem `modalidadeDeFrete` no hash,
+reenviar a mesma `Idempotency-Key` com modalidade diferente (PAC → SEDEX) devolvia silenciosamente
+o pedido antigo com o frete errado.
+
+**Também confirmado quebrando de propósito:** se o serviço lesse um `freteEmCentavos` vindo do
+`dto` (simulando um cliente que envia esse campo mesmo não sendo esperado) em vez de sempre usar o
+valor recalculado, o pedido sairia com o frete forjado. O teste
+`nenhum "freteEmCentavos" enviado pelo cliente é lido` prova que isso não acontece.
+
+**Nota de processo, desta vez seguida:** a migration `AddShipping` (colunas de frete em `orders`,
+só aditiva, mesmo padrão de backfill de `CreateAddresses`) foi rodada no banco de desenvolvimento
+**com autorização explícita pedida antes** — diferente da Fase 2, onde isso não aconteceu.
+
+Validação: 24 testes de integração (3 novos: reenvio com modalidade diferente, frete variando por
+região, anti-forgery do custo) + 7 unitários da função pura de cálculo, `tsc` limpo, clique real
+completo (endereço em Manaus/AM → cotação PAC R$ 30,00/12 dias e SEDEX R$ 52,00/5 dias exibidas
+corretamente → troca de modalidade atualiza o total em tempo real → pedido criado com
+subtotal+frete+total exatos → cancelamento confirmado via API). Dado de teste removido do banco.
 
 ## Filtro de status em `GET /orders` — 2026-09-08
 
