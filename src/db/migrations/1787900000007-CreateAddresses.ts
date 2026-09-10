@@ -5,7 +5,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // A tabela orders ganha as colunas de endereço congelado como NOT NULL desde
 // já: como não há pedido em produção anterior a esta migration com endereço
 // (a feature não existia), não há dado legado para migrar — diferente da
-// migration de dinheiro, que precisou de UPDATE antes do NOT NULL.
+// migration de dinheiro, que precisou de UPDATE antes do NOT NULL. Os pedidos
+// já existentes (dado de desenvolvimento, sem endereço real) recebem um
+// placeholder só para permitir o NOT NULL: são pedidos que já não têm relação
+// com um destino de entrega de verdade. RLS e REVOKE seguem a mesma política
+// das demais tabelas de domínio (migration EnableRls): o papel da API pública
+// do Supabase não recebe nenhum privilégio direto.
 // ---------------------------------------------
 export class CreateAddresses1787900000007 implements MigrationInterface {
   name = 'CreateAddresses1787900000007';
@@ -38,8 +43,6 @@ export class CreateAddresses1787900000007 implements MigrationInterface {
          ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
 
-    // Mesma política das demais tabelas de domínio (migration EnableRls): o
-    // papel da API pública do Supabase não recebe nenhum privilégio direto.
     await queryRunner.query(
       `ALTER TABLE "addresses" ENABLE ROW LEVEL SECURITY`,
     );
@@ -65,9 +68,6 @@ export class CreateAddresses1787900000007 implements MigrationInterface {
          ON DELETE SET NULL ON UPDATE NO ACTION`,
     );
 
-    // Pedidos existentes (dado de desenvolvimento, sem endereço real) recebem
-    // um placeholder para permitir o NOT NULL: são pedidos que já não têm
-    // relação com um destino de entrega de verdade.
     await queryRunner.query(
       `UPDATE "orders" SET
          "shippingRecipient" = 'Endereço não informado (pedido anterior a esta feature)',

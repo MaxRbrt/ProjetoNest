@@ -19,6 +19,14 @@ function eventoDeExemplo(sobrescreve: Partial<EventoDePagamento> = {}): EventoDe
   };
 }
 
+// ---------------------------------------------
+// Assinatura do webhook de pagamento
+// Dois casos merecem explicação por não serem óbvios pelo nome. O de campo
+// alterado simula o ataque real: trocar RECUSADO por APROVADO mantendo a
+// assinatura do evento original. O de tamanho diferente existe porque
+// timingSafeEqual lança para buffers de tamanhos distintos — a função
+// precisa blindar isso, não deixar vazar como erro 500.
+// ---------------------------------------------
 describe('assinarEvento / verificarAssinatura', () => {
   it('assinatura correta é aceita', () => {
     const evento = eventoDeExemplo();
@@ -30,8 +38,6 @@ describe('assinarEvento / verificarAssinatura', () => {
     const evento = eventoDeExemplo();
     const assinatura = assinarEvento(evento, SEGREDO);
 
-    // status alterado depois da assinatura ter sido calculada — simula um
-    // atacante tentando trocar RECUSADO por APROVADO mantendo a assinatura
     const eventoAdulterado = { ...evento, status: 'APROVADO' as const };
     const eventoOriginalRecusado = { ...evento, status: 'RECUSADO' as const };
     const assinaturaDoRecusado = assinarEvento(eventoOriginalRecusado, SEGREDO);
@@ -54,8 +60,6 @@ describe('assinarEvento / verificarAssinatura', () => {
   });
 
   it('rejeita assinatura de tamanho diferente sem lançar exceção', () => {
-    // timingSafeEqual lança para buffers de tamanho diferente — a função
-    // precisa blindar isso, não deixar vazar como erro 500.
     const evento = eventoDeExemplo();
     expect(() =>
       verificarAssinatura(evento, 'assinatura-curta-de-mentira', SEGREDO),

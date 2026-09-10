@@ -46,7 +46,6 @@ describe('GuardaDePapel', () => {
 
   it('nega quando o usuário está sob a chave "usuario" em vez de "user" — regressão do rename PT-BR', () => {
     const guard = new GuardaDePapel(reflectorRetornando(['ADMIN']));
-    // Mesmo dado, chave errada: o guard não pode aceitar isso silenciosamente.
     const request = { usuario: { papel: 'ADMIN' } };
     expect(() => guard.canActivate(contextoCom(request))).toThrow(
       ForbiddenException,

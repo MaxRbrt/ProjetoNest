@@ -15,7 +15,9 @@ import { SessoesService } from './sessoes.service';
 // para exercitar a lógica de SessoesService sem banco real. Cada objeto que
 // passa por create()/findOne()/semear() é registrado num WeakMap ligando o
 // objeto ao seu tipo de entidade, porque save(entidade) no TypeORM real não
-// recebe o tipo — ele é inferido da própria instância.
+// recebe o tipo — ele é inferido da própria instância. O update() suporta
+// apenas o que SessoesService usa: igualdade simples e o operador IsNull() do
+// TypeORM (internamente um FindOperator com `_type: 'isNull'`).
 // ---------------------------------------------
 type Registro = Record<string, unknown> & { id: string };
 
@@ -74,8 +76,6 @@ class FakeEntityManager {
     return Promise.resolve(entidade);
   }
 
-  // Suporta apenas o que SessoesService usa: igualdade simples e o operador
-  // IsNull() do TypeORM (internamente um FindOperator com `_type: 'isNull'`).
   update(
     Entidade: Function,
     criterio: Record<string, unknown>,
@@ -223,7 +223,6 @@ describe('SessoesService', () => {
         tokenUsadoEm: NO_PASSADO, // já consumido antes — reapresentação = roubo
       });
 
-      // segundo token válido, ainda não usado, na MESMA sessão
       const rawTokenIrmao = 'token-irmao-ainda-valido';
       manager.semear(TokenDeRenovacao, [
         {
@@ -249,7 +248,6 @@ describe('SessoesService', () => {
       const tokens = manager.obterTodos(TokenDeRenovacao);
       expect(tokens.every((t) => t.revogadoEm !== null)).toBe(true);
 
-      // o token irmão, que nunca foi reapresentado, também não serve mais
       await expect(servico.refresh(rawTokenIrmao, AGORA)).rejects.toThrow(
         UnauthorizedException,
       );
@@ -329,7 +327,6 @@ describe('SessoesService', () => {
         .find((s) => s.id === sessaoId)!;
       expect(sessao.revogadoEm).toEqual(AGORA);
 
-      // segunda chamada: sessão já revogada, mas não deve lançar
       await expect(servico.logout(rawToken, AGORA)).resolves.toBeUndefined();
     });
   });

@@ -10,6 +10,9 @@ import { SessoesService } from './services/sessoes.service';
 // GuardaDePapel e o registro do CLAUDE.md sobre nunca renomear esse campo.
 // Aqui cobrimos as duas metades: payload malformado nunca chega a consultar
 // sessão, e payload válido delega e devolve exatamente o que a sessão disser.
+// validate() não é async — payload malformado lança de forma síncrona, antes
+// de qualquer Promise existir, por isso os testes desse caminho chamam
+// através de uma função em vez de usar `.rejects`.
 // ---------------------------------------------
 describe('EstrategiaJwt', () => {
   let sessions: { validarSessaoAtiva: jest.Mock };
@@ -31,9 +34,6 @@ describe('EstrategiaJwt', () => {
     estrategia = new EstrategiaJwt(config, sessions as unknown as SessoesService);
   });
 
-  // validate() não é async: payload malformado lança de forma síncrona,
-  // antes de qualquer Promise existir — por isso o teste chama através de
-  // uma função em vez de usar `.rejects`.
   it('rejeita payload sem sub, sem consultar SessoesService', () => {
     expect(() => estrategia.validate({ sid: randomUUID() })).toThrow(
       UnauthorizedException,

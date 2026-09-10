@@ -7,6 +7,9 @@ import { SenhasVazadasService } from './senhas-vazadas.service';
 // Cobre hashing/verificação, a proteção temporal contra conta inexistente
 // (verificarFalsa) e a contagem de senha por ponto de código Unicode, não
 // por .length — ver comentário de exigenciasNaoCumpridas em politica-de-senha.ts.
+// O caso do emoji astral é a prova dessa contagem: "😀Aa1!bc" tem 7 pontos de
+// código (o emoji é 1), mas ocupa 2 unidades UTF-16, então .length nativo dá
+// 8 — se a validação usasse .length, essa senha passaria pelo mínimo.
 // ---------------------------------------------
 describe('SenhaService', () => {
   let senhasVazadas: { estaComprometida: jest.Mock };
@@ -52,9 +55,6 @@ describe('SenhaService', () => {
 
   describe('contagem por ponto de código, não por .length', () => {
     it('rejeita senha com 7 pontos de código mesmo quando .length é 8 (emoji astral)', async () => {
-      // "😀Aa1!bc" tem 7 pontos de código (o emoji é 1 codepoint), mas o
-      // emoji ocupa 2 unidades UTF-16, então .length nativo dá 8 — se a
-      // validação usasse .length, esta senha passaria pelo mínimo indevidamente.
       const senhaComEmoji = '😀Aa1!bc';
       expect(Array.from(senhaComEmoji).length).toBe(7);
       expect(senhaComEmoji.length).toBe(8);
