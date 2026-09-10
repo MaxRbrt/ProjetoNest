@@ -15,11 +15,17 @@ import { Usuario } from '../../usuarios/usuario.entity';
 // Situação do pedido
 // Os valores continuam em PT-BR maiúsculo porque já estão gravados no banco,
 // no tipo enum orders_status_enum: mudá-los exigiria migração de dados.
+// ENVIADO/ENTREGUE entraram em 2026-09-09 (Fase 4) via
+// ALTER TYPE ... ADD VALUE, não recriando o tipo — Postgres não permite
+// remover valor de enum, então a migration de reversão precisa recriar o
+// tipo do zero (ver 1787900000010-AddOrderShippingStates).
 // ---------------------------------------------
 export enum SituacaoDoPedido {
   PENDENTE = 'PENDENTE',
   PAGO = 'PAGO',
   CANCELADO = 'CANCELADO',
+  ENVIADO = 'ENVIADO',
+  ENTREGUE = 'ENTREGUE',
 }
 
 @Entity('orders')

@@ -57,8 +57,15 @@ export function hashDoPayloadDoPedido(
 // Transições permitidas do pedido
 // CANCELADO não aparece como origem por ser terminal, e repetir o status
 // atual também é recusado — quem chega aqui esperando mudar algo precisa
-// saber que nada mudou. ADMIN é exigido para confirmar pagamento e para
-// cancelar pedido já pago, que envolveria estorno financeiro.
+// saber que nada mudou. PENDENTE->PAGO não está nesta lista de propósito:
+// desde a Fase 4, é a única transição que passa exclusivamente pelo webhook
+// assinado de PagamentosService, nunca por PATCH manual — permitir as duas
+// portas tornaria a assinatura, a idempotência e o anti-forjamento do
+// módulo de pagamento decorativos (achado real de revisão adversarial,
+// 2026-09-10, ver CLAUDE.md). ADMIN é exigido para cancelar pedido já pago
+// e para os dois passos de logística. ENVIADO/ENTREGUE não podem ser
+// cancelados por aqui: não há estorno de frete nem reversão de envio físico
+// modelados neste sistema.
 // ---------------------------------------------
 const ALLOWED_TRANSITIONS: ReadonlyArray<{
   from: SituacaoDoPedido;
@@ -67,17 +74,22 @@ const ALLOWED_TRANSITIONS: ReadonlyArray<{
 }> = [
   {
     from: SituacaoDoPedido.PENDENTE,
-    to: SituacaoDoPedido.PAGO,
-    adminOnly: true,
-  },
-  {
-    from: SituacaoDoPedido.PENDENTE,
     to: SituacaoDoPedido.CANCELADO,
     adminOnly: false,
   },
   {
     from: SituacaoDoPedido.PAGO,
     to: SituacaoDoPedido.CANCELADO,
+    adminOnly: true,
+  },
+  {
+    from: SituacaoDoPedido.PAGO,
+    to: SituacaoDoPedido.ENVIADO,
+    adminOnly: true,
+  },
+  {
+    from: SituacaoDoPedido.ENVIADO,
+    to: SituacaoDoPedido.ENTREGUE,
     adminOnly: true,
   },
 ];
