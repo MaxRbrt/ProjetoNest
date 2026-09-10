@@ -15,17 +15,44 @@ import { Usuario } from '../../usuarios/usuario.entity';
 // Situação do pedido
 // Os valores continuam em PT-BR maiúsculo porque já estão gravados no banco,
 // no tipo enum orders_status_enum: mudá-los exigiria migração de dados.
+// ENVIADO/ENTREGUE entraram em 2026-09-09 (Fase 4) via
+// ALTER TYPE ... ADD VALUE, não recriando o tipo — Postgres não permite
+// remover valor de enum, então a migration de reversão precisa recriar o
+// tipo do zero (ver 1787900000010-AddOrderShippingStates).
 // ---------------------------------------------
 export enum SituacaoDoPedido {
   PENDENTE = 'PENDENTE',
   PAGO = 'PAGO',
   CANCELADO = 'CANCELADO',
+  ENVIADO = 'ENVIADO',
+  ENTREGUE = 'ENTREGUE',
 }
 
 @Entity('orders')
 export class Pedido {
   @PrimaryGeneratedColumn()
   id: number;
+
+  // ---------------------------------------------
+  // Composição do total
+  // totalEmCentavos = subtotalEmCentavos + freteEmCentavos, calculado uma vez
+  // na criação e congelado — mudança futura na tabela de frete não pode
+  // alterar o valor de um pedido já pago. subtotal fica column própria (em
+  // vez de recalcular somando itens toda leitura) pelo mesmo motivo de
+  // congelar preço de item: é o valor que o pedido realmente teve, não o que
+  // os itens somariam hoje.
+  // ---------------------------------------------
+  @Column('integer', { name: 'subtotalInCents' })
+  subtotalEmCentavos: number;
+
+  @Column('integer', { name: 'shippingCostInCents' })
+  freteEmCentavos: number;
+
+  @Column({ type: 'varchar', length: 10, name: 'shippingMethod' })
+  modalidadeDeFrete: string;
+
+  @Column({ type: 'integer', name: 'shippingEstimatedDays' })
+  prazoEmDiasUteis: number;
 
   @Column('integer', { name: 'totalInCents' })
   totalEmCentavos: number;
@@ -77,4 +104,45 @@ export class Pedido {
 
   @Column({ type: 'char', length: 64, nullable: true, name: 'payloadHash' })
   hashDoPayload: string | null;
+
+  // ---------------------------------------------
+  // Endereço de entrega, congelado no momento da compra
+  // A referência (enderecoId) fica para rastreabilidade administrativa, mas
+  // quem exibe o pedido lê sempre os campos congelados abaixo, nunca o
+  // endereço vivo — mesma razão de ItemDoPedido congelar nome e preço:
+  // editar o endereço depois não pode reescrever para onde a compra já foi
+  // enviada. ON DELETE SET NULL porque apagar o endereço não pode apagar o
+  // histórico do pedido.
+  // ---------------------------------------------
+  @Column({ type: 'integer', nullable: true, name: 'addressId' })
+  enderecoId: number | null;
+
+  @Column({ type: 'varchar', length: 120, name: 'shippingRecipient' })
+  enderecoDestinatario: string;
+
+  @Column({ type: 'char', length: 8, name: 'shippingCep' })
+  enderecoCep: string;
+
+  @Column({ type: 'varchar', length: 200, name: 'shippingStreet' })
+  enderecoLogradouro: string;
+
+  @Column({ type: 'varchar', length: 20, name: 'shippingNumber' })
+  enderecoNumero: string;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+    name: 'shippingComplement',
+  })
+  enderecoComplemento: string | null;
+
+  @Column({ type: 'varchar', length: 100, name: 'shippingNeighborhood' })
+  enderecoBairro: string;
+
+  @Column({ type: 'varchar', length: 100, name: 'shippingCity' })
+  enderecoCidade: string;
+
+  @Column({ type: 'char', length: 2, name: 'shippingState' })
+  enderecoUf: string;
 }

@@ -17,6 +17,11 @@ import { ConsultaPaginadaDto } from '../../common/dto/consulta-paginada.dto';
 import { Pedido, SituacaoDoPedido } from './entities/pedido.entity';
 import { ItemDoPedido } from './entities/item-do-pedido.entity';
 import { Produto } from '../produtos/produto.entity';
+import { Endereco } from '../enderecos/endereco.entity';
+import {
+  calcularOpcaoDeFrete,
+  type ModalidadeDeFrete,
+} from '../frete/calculo-de-frete';
 import { Papel } from '../usuarios/usuario.entity';
 import { UsuarioPublico } from '../usuarios/usuarios.service';
 import { CriarPedidoDto, CriarItemDoPedidoDto } from './dto/criar-pedido.dto';
@@ -26,22 +31,41 @@ import { ConsultaDePedidosDto } from './dto/consulta-de-pedidos.dto';
 // ---------------------------------------------
 // Hash do payload para conferência de Idempotency-Key
 // Itens ordenados por productId: o mesmo carrinho gera o mesmo hash
-// independente da ordem em que o cliente enviou os itens no corpo.
+// independente da ordem em que o cliente enviou os itens no corpo. enderecoId
+// e modalidadeDeFrete entram no hash pelo mesmo motivo: qualquer campo que
+// afete o pedido final precisa estar aqui, senão reenviar a mesma chave com
+// um desses campos diferente devolveria silenciosamente o pedido antigo —
+// endereço ou frete errado — em vez de acusar conflito de payload. Foi assim
+// que o esquecimento do enderecoId virou bug real na Fase 2; modalidadeDeFrete
+// entra desde já para não repetir.
 // ---------------------------------------------
-export function hashDoPayloadDoPedido(itens: CriarItemDoPedidoDto[]): string {
+export function hashDoPayloadDoPedido(
+  enderecoId: number,
+  modalidadeDeFrete: string,
+  itens: CriarItemDoPedidoDto[],
+): string {
   const normalized = [...itens]
     .sort((a, b) => a.produtoId - b.produtoId)
     .map((item) => `${item.produtoId}:${item.quantidade}`)
     .join(',');
-  return createHash('sha256').update(normalized, 'utf8').digest('hex');
+  return createHash('sha256')
+    .update(`${enderecoId}|${modalidadeDeFrete}|${normalized}`, 'utf8')
+    .digest('hex');
 }
 
 // ---------------------------------------------
 // Transições permitidas do pedido
 // CANCELADO não aparece como origem por ser terminal, e repetir o status
 // atual também é recusado — quem chega aqui esperando mudar algo precisa
-// saber que nada mudou. ADMIN é exigido para confirmar pagamento e para
-// cancelar pedido já pago, que envolveria estorno financeiro.
+// saber que nada mudou. PENDENTE->PAGO não está nesta lista de propósito:
+// desde a Fase 4, é a única transição que passa exclusivamente pelo webhook
+// assinado de PagamentosService, nunca por PATCH manual — permitir as duas
+// portas tornaria a assinatura, a idempotência e o anti-forjamento do
+// módulo de pagamento decorativos (achado real de revisão adversarial,
+// 2026-09-10, ver CLAUDE.md). ADMIN é exigido para cancelar pedido já pago
+// e para os dois passos de logística. ENVIADO/ENTREGUE não podem ser
+// cancelados por aqui: não há estorno de frete nem reversão de envio físico
+// modelados neste sistema.
 // ---------------------------------------------
 const ALLOWED_TRANSITIONS: ReadonlyArray<{
   from: SituacaoDoPedido;
@@ -50,17 +74,22 @@ const ALLOWED_TRANSITIONS: ReadonlyArray<{
 }> = [
   {
     from: SituacaoDoPedido.PENDENTE,
-    to: SituacaoDoPedido.PAGO,
-    adminOnly: true,
-  },
-  {
-    from: SituacaoDoPedido.PENDENTE,
     to: SituacaoDoPedido.CANCELADO,
     adminOnly: false,
   },
   {
     from: SituacaoDoPedido.PAGO,
     to: SituacaoDoPedido.CANCELADO,
+    adminOnly: true,
+  },
+  {
+    from: SituacaoDoPedido.PAGO,
+    to: SituacaoDoPedido.ENVIADO,
+    adminOnly: true,
+  },
+  {
+    from: SituacaoDoPedido.ENVIADO,
+    to: SituacaoDoPedido.ENTREGUE,
     adminOnly: true,
   },
 ];
@@ -205,7 +234,7 @@ export class PedidosService {
     exigirProdutosSemRepeticao(dto.itens);
     const idempotencyKey = normalizarChaveDeIdempotencia(rawIdempotencyKey);
     const payloadHash = idempotencyKey
-      ? hashDoPayloadDoPedido(dto.itens)
+      ? hashDoPayloadDoPedido(dto.enderecoId, dto.modalidadeDeFrete, dto.itens)
       : null;
 
     if (idempotencyKey) {
@@ -341,7 +370,15 @@ export class PedidosService {
     payloadHash: string | null,
   ): Promise<Pedido> {
     return this.repositorioDePedidos.manager.transaction(async (manager) => {
-      let totalEmCentavos = 0;
+      const endereco = await manager.findOne(Endereco, {
+        where: { id: dto.enderecoId, usuarioId: usuario.id },
+      });
+      if (!endereco) {
+        throw new NotFoundException(`Endereço ${dto.enderecoId} não encontrado`);
+      }
+
+      let subtotalEmCentavos = 0;
+      let quantidadeDeItens = 0;
       const itens: ItemDoPedido[] = [];
 
       const sortedItems = [...dto.itens].sort(
@@ -364,7 +401,8 @@ export class PedidosService {
           );
         }
 
-        totalEmCentavos += produto.precoEmCentavos * item.quantidade;
+        subtotalEmCentavos += produto.precoEmCentavos * item.quantidade;
+        quantidadeDeItens += item.quantidade;
 
         const itemDoPedido = new ItemDoPedido();
         itemDoPedido.produtoId = item.produtoId;
@@ -377,12 +415,33 @@ export class PedidosService {
         await manager.save(produto);
       }
 
+      // O custo do frete nunca vem do cliente — só a modalidade escolhida.
+      // Recalculado aqui, na criação, com o endereço e a quantidade reais.
+      const opcaoDeFrete = calcularOpcaoDeFrete(
+        endereco.uf,
+        quantidadeDeItens,
+        dto.modalidadeDeFrete as ModalidadeDeFrete,
+      );
+
       const pedido = manager.create(Pedido, {
-        totalEmCentavos,
+        subtotalEmCentavos,
+        freteEmCentavos: opcaoDeFrete.custoEmCentavos,
+        modalidadeDeFrete: opcaoDeFrete.modalidade,
+        prazoEmDiasUteis: opcaoDeFrete.prazoEmDiasUteis,
+        totalEmCentavos: subtotalEmCentavos + opcaoDeFrete.custoEmCentavos,
         itens,
         usuarioId: usuario.id,
         chaveDeIdempotencia: idempotencyKey,
         hashDoPayload: payloadHash,
+        enderecoId: endereco.id,
+        enderecoDestinatario: endereco.destinatario,
+        enderecoCep: endereco.cep,
+        enderecoLogradouro: endereco.logradouro,
+        enderecoNumero: endereco.numero,
+        enderecoComplemento: endereco.complemento,
+        enderecoBairro: endereco.bairro,
+        enderecoCidade: endereco.cidade,
+        enderecoUf: endereco.uf,
       });
       return manager.save(pedido);
     });

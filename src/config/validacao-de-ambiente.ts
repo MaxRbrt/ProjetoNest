@@ -14,6 +14,7 @@ const REQUIRED_KEYS = [
   'JWT_AUDIENCE',
   'EMAIL_FROM',
   'FRONTEND_URL',
+  'PAYMENT_WEBHOOK_SECRET',
 ] as const;
 
 const PLACEHOLDER_PATTERN = /(replace|placeholder|change[-_ ]?me)/i;
@@ -138,6 +139,22 @@ export function validarAmbiente(input: Environment): Environment {
     errors.push('JWT_SECRET deve ter pelo menos 32 bytes');
   } else if (jwtSecret && PLACEHOLDER_PATTERN.test(jwtSecret)) {
     errors.push('JWT_SECRET não pode ser placeholder');
+  }
+
+  // ---------------------------------------------
+  // Segredo de assinatura do webhook de pagamento
+  // Mesma exigência de tamanho do JWT_SECRET: é a chave HMAC que autentica
+  // POST /payments/webhook — curta ou previsível, um atacante forjaria
+  // confirmação de pagamento sem nunca ter cobrado ninguém.
+  // ---------------------------------------------
+  const paymentWebhookSecret = asText(environment.PAYMENT_WEBHOOK_SECRET);
+  if (paymentWebhookSecret && Buffer.byteLength(paymentWebhookSecret, 'utf8') < 32) {
+    errors.push('PAYMENT_WEBHOOK_SECRET deve ter pelo menos 32 bytes');
+  } else if (
+    paymentWebhookSecret &&
+    PLACEHOLDER_PATTERN.test(paymentWebhookSecret)
+  ) {
+    errors.push('PAYMENT_WEBHOOK_SECRET não pode ser placeholder');
   }
 
   const resendApiKey = asText(environment.RESEND_API_KEY);

@@ -22,7 +22,10 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
 | Dinheiro | **Centavos inteiros** (`priceInCents`, `unitPriceInCents`, `totalInCents`). O `float` saiu em 2026-09-09 — ver seção própria |
-| Testes | `auth` com 47 unitários (`npm test`) + 11 de integração contra Postgres real em container (`npm run test:integration`). Demais módulos sem cobertura — ver dívidas |
+| Endereços | Módulo `enderecos` completo (CRUD, um principal por usuário) + snapshot congelado no pedido — ver seção própria, 2026-09-09 |
+| Frete | Módulo `frete`, cálculo **simulado** determinístico por região + quantidade, custo sempre recalculado no servidor na criação do pedido — ver seção própria, 2026-09-09 |
+| Pagamento | Módulo `pagamentos`, provedor **simulado**, webhook assinado (HMAC) e idempotente, ciclo `PENDENTE→PAGO→ENVIADO→ENTREGUE` — ver seção própria, 2026-09-09/10 |
+| Testes | 68 unitários (`npm test`) + 34 de integração contra Postgres real em container (`npm run test:integration`, cobre sessões, dinheiro, endereços, frete e pagamento/webhook). Demais módulos sem cobertura — ver dívidas |
 
 ## Decisões que não são óbvias no código
 
@@ -134,6 +137,209 @@ Verificação: 11 testes de integração (incluindo conversão com dado real, `1
 `0.01 → 1`, `1234.56 → 123456`, e a reversão de volta), e clique real conferindo vitrine
 (R$ 99,90), carrinho (3 × R$ 99,90 = R$ 299,70) e pedido criado com `totalInCents` 29970 exato.
 Dado de teste removido do banco ao final.
+
+## Endereços de entrega — 2026-09-09
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 2. Módulo do zero:
+não existia nenhum conceito de endereço no sistema antes disso.
+
+`GET/POST /addresses`, `GET/PATCH/DELETE /addresses/:id`, tudo escopado ao dono. **Endereço alheio
+devolve 404, não 403** — mesma regra e mesmo motivo já usados em pedido (um 403 confirmaria a
+existência do endereço para quem não é dono). No máximo um endereço `principal` por usuário,
+garantido pelo serviço numa transação (`desmarcarPrincipais` antes de marcar o novo), não por
+constraint de banco. Primeiro endereço cadastrado nasce principal automaticamente. Remover o
+principal promove o mais recente restante.
+
+`POST /orders` passa a exigir `enderecoId`. O pedido **congela** os campos do endereço no momento
+da compra (`shippingRecipient`, `shippingStreet`, etc., colunas próprias em `orders`, não uma
+referência que se leria ao vivo) — mesma razão de `ItemDoPedido` congelar nome e preço: editar o
+endereço depois não pode reescrever para onde a compra já foi enviada. `addressId` fica como
+referência de rastreabilidade (`ON DELETE SET NULL`), mas nenhuma leitura de pedido usa esse campo
+para exibir dado — sempre lê as colunas congeladas.
+
+**Achado real: idempotência precisava do endereço no hash.** `hashDoPayloadDoPedido` só
+considerava os itens do carrinho. Depois que o endereço passou a fazer parte do pedido, reenviar a
+mesma `Idempotency-Key` com um endereço *diferente* devolveria silenciosamente o pedido antigo, com
+o endereço errado, em vez de acusar conflito de payload (409). Corrigido incluindo `enderecoId` no
+hash. Confirmado com teste de integração que quebra de propósito (removendo `enderecoId` da
+chamada) e vê o bug voltar antes de aceitar a correção como válida.
+
+**Achado real: meu primeiro teste de lock/concorrência em `enderecos` também seguiu o mesmo
+cuidado da suíte de auth** — testado quebrando `desmarcarPrincipais` de propósito antes de aceitar
+os testes como válidos; sem ela, 2 dos 7 testes de `enderecos.int-spec.ts` falham corretamente.
+
+**Achado no clique real: migration nunca tinha rodado no banco de desenvolvimento.** Os testes de
+integração validaram tudo contra o container Docker, mas ninguém executou `npm run migration:run`
+no Supabase de desenvolvimento — `GET /addresses` respondia 500 (`relation "addresses" does not
+exist`, Postgres 42P01) até a migration `CreateAddresses1787900000007` ser aplicada manualmente.
+**Nota de processo:** essa migration rodou sem o bloqueio do classificador de segurança que travou
+a migration de dinheiro na Fase 1 — ao contrário daquela vez, não houve confirmação explícita do
+proprietário antes de rodar contra o banco de desenvolvimento. Diferença de risco relevante: esta
+migration é só aditiva (cria tabela nova, adiciona coluna nullable-depois-preenchida em `orders`,
+sem apagar nada), enquanto a de dinheiro descartava as colunas antigas — mas o processo correto
+seria pedir de qualquer forma. Registrado aqui para não repetir sem avisar.
+
+Também achado durante a mesma migration: RLS ativo em todas as tabelas de domínio, mas a migration
+inicial de `addresses` esqueceu de replicar isso — corrigido antes de rodar (mesma política de
+`EnableRls`: `REVOKE ALL ... FROM anon, authenticated`).
+
+Validação: 21 testes de integração (10 novos: 7 de `enderecos`, 3 de congelamento/idempotência em
+pedidos), `tsc` limpo, clique real completo (cadastro de endereço → checkout com seleção de
+endereço → pedido criado com endereço congelado → edição do endereço → pedido continua mostrando o
+endereço antigo). Dado de teste removido do banco ao final.
+
+## Frete — 2026-09-09
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 3. Módulo do zero.
+
+`POST /shipping/quote { enderecoId, itens }` devolve `[{ modalidade, custoEmCentavos,
+prazoEmDiasUteis }]` para `PAC` e `SEDEX`. **Cálculo simulado e determinístico**
+(`src/modules/frete/calculo-de-frete.ts`) por região da UF de destino (Norte/Nordeste/
+Centro-Oeste/Sudeste/Sul) e quantidade total de itens — não é integração com transportadora, não
+há peso/volume real. Mesmo endereço e mesma quantidade sempre devolvem o mesmo valor.
+
+`POST /orders` passa a exigir `modalidadeDeFrete` (só `'PAC'` ou `'SEDEX'`, validado por `@IsIn` no
+DTO). **Decisão de design deliberada, mais forte que "recalcular e comparar":** o cliente nunca
+envia o custo do frete, só a modalidade escolhida — `CriarPedidoDto` não declara nenhum campo de
+custo, e o `ValidationPipe` (`whitelist: true`) descartaria qualquer um que tentasse mandar. O
+serviço recalcula o custo a partir do endereço e da quantidade real de itens toda vez, na própria
+transação de criação. Não existe payload de frete para forjar porque não existe campo de frete no
+payload — comparar um valor enviado contra o recalculado seria mais complexo e não mais seguro.
+
+`Pedido` ganha `subtotalEmCentavos`, `freteEmCentavos`, `modalidadeDeFrete`, `prazoEmDiasUteis`;
+`totalEmCentavos` passa a ser subtotal + frete, os dois congelados na criação (mudança futura na
+tabela de frete não pode alterar pedido já pago).
+
+**Achado real: idempotência precisava do `modalidadeDeFrete` no hash, e desta vez entrou desde o
+início** — a Fase 2 esqueceu o `enderecoId` e só descobriu com teste quebrando; aqui o hash já
+nasceu incluindo os dois (`hashDoPayloadDoPedido(enderecoId, modalidadeDeFrete, itens)`). Confirmado
+mesmo assim quebrando de propósito antes de aceitar como correto: sem `modalidadeDeFrete` no hash,
+reenviar a mesma `Idempotency-Key` com modalidade diferente (PAC → SEDEX) devolvia silenciosamente
+o pedido antigo com o frete errado.
+
+**Também confirmado quebrando de propósito:** se o serviço lesse um `freteEmCentavos` vindo do
+`dto` (simulando um cliente que envia esse campo mesmo não sendo esperado) em vez de sempre usar o
+valor recalculado, o pedido sairia com o frete forjado. O teste
+`nenhum "freteEmCentavos" enviado pelo cliente é lido` prova que isso não acontece.
+
+**Nota de processo, desta vez seguida:** a migration `AddShipping` (colunas de frete em `orders`,
+só aditiva, mesmo padrão de backfill de `CreateAddresses`) foi rodada no banco de desenvolvimento
+**com autorização explícita pedida antes** — diferente da Fase 2, onde isso não aconteceu.
+
+Validação: 24 testes de integração (3 novos: reenvio com modalidade diferente, frete variando por
+região, anti-forgery do custo) + 7 unitários da função pura de cálculo, `tsc` limpo, clique real
+completo (endereço em Manaus/AM → cotação PAC R$ 30,00/12 dias e SEDEX R$ 52,00/5 dias exibidas
+corretamente → troca de modalidade atualiza o total em tempo real → pedido criado com
+subtotal+frete+total exatos → cancelamento confirmado via API). Dado de teste removido do banco.
+
+## Pagamento simulado + ciclo até entrega — 2026-09-09/10
+
+Roadmap: `docs/superpowers/plans/2026-09-09-roadmap-nucleo-comercial.md`, Fase 4 — a mais sensível
+do roadmap (webhook, assinatura, idempotência, dinheiro). Módulo `pagamentos` do zero.
+
+**Contrato:** `POST /orders/:id/payments` cria uma tentativa de pagamento (`Pagamento`, uma linha
+por tentativa, não uma por pedido — cartão recusado permite tentar de novo). `GET
+/orders/:id/payments` lista o histórico. `POST /payments/webhook` — rota **pública**
+(`@Publico()`), autenticada por assinatura HMAC-SHA256, não por token de usuário — é o único
+caminho que move `PENDENTE→PAGO`. Provedor **simulado**: cartão terminado em `0002` recusa
+(mesmo padrão de "cartão de teste" de provedores reais), qualquer outro aprova,
+determinístico. `SituacaoDoPedido` ganhou `ENVIADO`/`ENTREGUE` (`PAGO→ENVIADO→ENTREGUE`, só
+ADMIN, via `PATCH /orders/:id/status` já existente — zero mudança de controller, só enum e
+tabela de transições).
+
+**Assinatura sem preservar raw body:** a string canônica (`eventId|pagamentoId|pedidoId|status|
+timestamp`) é montada a partir de campos já validados pelo DTO, não do corpo bruto da requisição
+— dispensa configurar o Nest/Express para expor o raw body só nesta rota. Funciona porque
+assinante e verificador são o mesmo código (provedor simulado); não há formato de serialização de
+provedor externo real para divergir. `criarIntencao` e `processarWebhook` são **duas transações
+separadas**, não uma aninhada dentro da outra — de propósito: é exatamente como funcionaria com
+um provedor real (cria a cobrança agora, confirma depois, numa requisição separada), e
+`criarIntencao` chama `processarWebhook` internamente com um evento assinado por ela mesma — o
+MESMO código de verificação roda em todo pagamento, não existe atalho que pule a checagem.
+
+**Achado real, o mais sutil desta sessão inteira — o que o lock de `pessimistic_write` realmente
+compra não é bloqueio, é frescor.** Escrevendo o teste de concorrência, tentei três vezes antes de
+isolar a variável certa:
+
+1. Duas chamadas reais de `criarIntencao` via `Promise.allSettled` — passou com e sem o lock,
+   mesmo falso-verde já registrado na Fase 1 (sem sobreposição forçada, a segunda só começa depois
+   que a primeira já terminou tudo).
+2. Duas `QueryRunner`s travando a linha manualmente, sem nunca chamar o serviço — provava lock
+   genérico do Postgres, não o código sob teste.
+3. Travar a linha por fora e chamar `criarIntencao` de verdade, medindo quanto tempo até resolver
+   — parecia funcionar (ficava pendurado, só resolvia após o commit externo), mas continuava
+   "passando" mesmo comentando o `lock` do `findOne`. Investigando com `pg_stat_activity` ao vivo:
+   o que estava esperando era o **UPDATE final em `orders`** (`manager.save(pedido)`), preso num
+   `wait_event: transactionid` — e isso acontece com **qualquer** UPDATE contra uma linha que outra
+   transação já travou com `FOR UPDATE`, **com ou sem** o `lock` no `SELECT` que o precede. Medir
+   "quanto tempo até resolver" não provava nada sobre o `lock` — provava só que um UPDATE depois
+   dele sempre esbarra em alguém segurando a linha.
+
+   O que o `lock` no `SELECT` realmente garante: a **leitura** espera a liberação e relê o valor
+   atual, em vez de decidir com um dado que pode estar desatualizado quando o UPDATE rodar depois.
+   Sem o lock na leitura, o código lê `PENDENTE` (verdadeiro no instante da leitura), decide
+   aprovar, e só o UPDATE fica preso esperando — quando libera, roda a decisão tomada com dado
+   velho, **sobrescrevendo qualquer mudança real que tenha acontecido nesse meio-tempo**.
+
+   Teste final: cancela o pedido (por outra transação) enquanto o webhook de aprovação está em
+   voo. Com o lock, o pedido cancelado fica cancelado. Sem o lock — confirmado quebrando de
+   propósito antes de aceitar como corrigido — **o pagamento aprovado ressuscitava o pedido
+   cancelado de volta para PAGO**. Bug de negócio real, não hipotético: pagar um pedido que o
+   cliente (ou o admin) já cancelou.
+
+**Outros achados confirmados quebrando de propósito, cada um restaurado e reverificado antes de
+seguir:**
+- Verificação de assinatura desligada → webhook forjado aprova pagamento sem cobrar ninguém.
+- `timingSafeEqual` sem guarda de tamanho → `RangeError` (500) em vez de 401 para assinatura de
+  tamanho errado — o guard de comprimento antes da comparação é obrigatório, não estético.
+- `INSERT ... ON CONFLICT DO NOTHING` em vez de `try/catch` na trava de idempotência do evento:
+  capturar a violação de unicidade **não bastava** — no Postgres, uma instrução que falha deixa a
+  transação inteira em estado "aborted", e qualquer query seguinte na mesma transação falha com
+  "current transaction is aborted" mesmo com o erro já tratado no lado do Node. `ON CONFLICT DO
+  NOTHING` nunca falha a instrução, então a transação segue utilizável nos dois casos (inseriu ou
+  não).
+
+Validação: 36 testes de integração no total (12 novos), 68 unitários (7 novos: provedor simulado +
+assinatura), `tsc` limpo. Migrations `CreatePayments` e `AddOrderShippingStates` — a segunda usa
+`ALTER TYPE ... ADD VALUE` (Postgres não tem `DROP VALUE`; a reversão recria o tipo do zero e
+recusa rodar se algum pedido estiver em `ENVIADO`/`ENTREGUE`).
+
+### Revisão adversarial do Codex — 3 achados reais, todos corrigidos (2026-09-10)
+
+Primeira revisão do Codex desde a Fase 0 (crédito voltou por uma rodada; acabou de novo logo
+depois). Rodada depois da fase já estar "pronta e verificada" — os três achados sobreviveram a
+toda a disciplina de quebrar-e-restaurar aplicada durante a construção, o que é o argumento mais
+forte já registrado neste projeto a favor da segunda opinião.
+
+1. **O módulo de pagamento inteiro era contornável por um PATCH de ADMIN.** `PENDENTE→PAGO`
+   existia na tabela de transições manuais desde a Fase de gestão admin (2026-09-08), quando ainda
+   não havia pagamento nenhum no sistema — a justificativa registrada era "pagamento por fora, PIX
+   avulso". Com a Fase 4, virou uma segunda porta para o mesmo estado, e uma porta sem assinatura,
+   sem idempotência e sem decisão do provedor. Assinatura HMAC, janela de replay e trava de evento
+   viram enfeite se existe um caminho paralelo que chega no mesmo lugar sem nada disso. Removida a
+   transição (e o botão "Marcar como pago manualmente" no frontend, junto com o tipo
+   `SituacaoAlteravel` que impede o compilador de deixar ela voltar). Decisão do proprietário,
+   perguntada explicitamente — é remoção de feature, não fix mecânico. Teste de integração novo
+   trava a regra; confirmado que falha ao recolocar a transição.
+2. **Tentativa de pagamento órfã em `PENDENTE` para sempre.** `criarIntencao` commita o
+   `Pagamento` numa transação e confirma o resultado noutra (deliberado — é a forma de um provedor
+   real). Se a segunda falhasse por motivo alheio ao provedor (blip de banco, e este projeto já
+   viu instabilidade de pooler antes), a tentativa ficava `PENDENTE` sem ninguém para reprocessá-la
+   — o evento só existia em memória, e o retry do cliente criava outra linha em vez de retomar a
+   anterior. Corrigido resolvendo a tentativa como `RECUSADO` com motivo explícito, o que reaproveita
+   a UX já existente de cartão recusado (pedido continua `PENDENTE`, cliente tenta de novo).
+   Verificado por teste que injeta falha no `processarWebhook`; confirmado que falha sem o fix.
+3. **Resposta perdida deixava o comprador achando que não pagou.** Se o POST de pagamento fosse
+   processado no servidor mas a resposta (ou o GET seguinte) se perdesse, o `catch` do formulário
+   só mostrava erro genérico e liberava "Pagar" de novo — a tela seguia mostrando `PENDENTE` de um
+   pedido já `PAGO`, e a nova tentativa batia num 409 sem explicação. Corrigido delegando a falha
+   ambígua ao mecanismo de "Atualizar pedido" do componente pai (`precisaAtualizar`), que já
+   existia para exatamente esta classe de erro nas outras ações — era o padrão da casa, só não
+   tinha sido ligado no caminho novo.
+
+Descartados pelo Codex depois de investigar: assinatura (nenhum bypass; alterar qualquer campo
+assinado invalida o HMAC), janela de replay, exposição da rota pública do webhook, injeção de
+valor/status pelo cliente e acesso a pagamento alheio.
 
 ## Filtro de status em `GET /orders` — 2026-09-08
 
