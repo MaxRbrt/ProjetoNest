@@ -225,6 +225,9 @@ export class PedidosService {
   // que a vencedora já salvou, em vez de propagar o erro do banco. Produto
   // duplicado no carrinho e chave vazia/maior que 128 caracteres são 400
   // antes de qualquer consulta ou cálculo de hash.
+  //
+  // O custo do frete nunca vem do cliente — só a modalidade escolhida. É
+  // recalculado aqui, na criação, com o endereço e a quantidade reais.
   // ---------------------------------------------
   async criar(
     dto: CriarPedidoDto,
@@ -415,8 +418,6 @@ export class PedidosService {
         await manager.save(produto);
       }
 
-      // O custo do frete nunca vem do cliente — só a modalidade escolhida.
-      // Recalculado aqui, na criação, com o endereço e a quantidade reais.
       const opcaoDeFrete = calcularOpcaoDeFrete(
         endereco.uf,
         quantidadeDeItens,

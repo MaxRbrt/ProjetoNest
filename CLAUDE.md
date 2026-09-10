@@ -341,6 +341,28 @@ Descartados pelo Codex depois de investigar: assinatura (nenhum bypass; alterar 
 assinado invalida o HMAC), janela de replay, exposição da rota pública do webhook, injeção de
 valor/status pelo cliente e acesso a pagamento alheio.
 
+### Fase Final do roadmap — dois achados de processo (2026-09-10)
+
+Fecha o núcleo comercial: 68 unitários + 36 de integração, `tsc` limpo, banco de desenvolvimento
+auditado e limpo. Os dois achados não estavam previstos e valem mais que o checklist em si.
+
+- **A varredura de comentário solto voltou com 47 ocorrências**, não vazia. A regra existe no
+  `CLAUDE.md` desde 2026-09-04 (quando 28 violações foram corrigidas) e mesmo assim as Fases 2, 3 e
+  4 introduziram violações novas. Todas corrigidas. **Rodar a varredura por fase, não só no fim** —
+  no fim ela vira uma dívida grande de uma vez, e o custo de mover 47 comentários é bem maior que o
+  de escrever cada um já no lugar certo.
+- **`DELETE` de pedido não devolve estoque — a rotina de limpeza corrompeu dado de desenvolvimento
+  em silêncio.** Quem devolve estoque é `atualizarSituacao` no caminho de cancelamento, com
+  `estornarEstoque`; um `DELETE` direto em `orders`/`order_items` remove a linha e pronto. A
+  limpeza da Fase 4 apagou dois pedidos assim, e o produto Mouse ficou com 2 unidades em vez de 4.
+  Ninguém teria notado sem a auditoria. **Script de limpeza que apaga pedido precisa devolver o
+  estoque junto**, ou cancelar pelo serviço antes de apagar.
+
+Estado do banco de desenvolvimento depois da auditoria (autorizada explicitamente): 3 usuários
+reais, 1 produto (Mouse, estoque 4), 1 categoria (Eletronicos), zero pedidos. Removidos 4 usuários
+de teste, 3 pedidos, 12 categorias e 1 produto acumulados ao longo de várias sessões — incluindo
+categorias com nome de tentativa de SQL injection, resquício de teste de segurança antigo.
+
 ## Filtro de status em `GET /orders` — 2026-09-08
 
 Spec: `docs/superpowers/specs/2026-09-08-filtro-status-pedidos-design.md`. Preparação para a futura

@@ -108,6 +108,12 @@ describe('AutenticacaoService — login', () => {
     expect(passwords.verificarFalsa).toHaveBeenCalledWith(DTO.senha);
   });
 
+  // ---------------------------------------------
+  // Senha errada com usuário existente
+  // Este caminho usa verify, não verificarFalsa (só usuário inexistente e
+  // conta bloqueada usam a falsa), e precisa conferir contra o hash de fato
+  // carregado do banco, não contra um valor qualquer.
+  // ---------------------------------------------
   it('senha errada, usuário existente: mesma exceção genérica', async () => {
     const usuario = usuarioBase({ hashDaSenha: 'hash-real-do-usuario' });
     manager.findOne.mockResolvedValue(usuario);
@@ -116,8 +122,6 @@ describe('AutenticacaoService — login', () => {
     await expect(servico.login(DTO)).rejects.toThrow(
       new UnauthorizedException(MENSAGEM_GENERICA),
     );
-    // caminho de senha errada usa verify, não verificarFalsa (só missing/locked usam),
-    // e precisa verificar contra o hash de fato carregado, não um valor qualquer.
     expect(passwords.verify).toHaveBeenCalledWith(
       'hash-real-do-usuario',
       DTO.senha,
@@ -162,11 +166,16 @@ describe('AutenticacaoService — login', () => {
     expect(sessions.complete).toHaveBeenCalledWith(persisted);
   });
 
+  // ---------------------------------------------
+  // Tempo mínimo de resposta do login
+  // Timers falsos de verdade, não um spy que executa o callback na hora: um
+  // spy assim provaria só que setTimeout foi chamado, não que o login
+  // realmente esperou — o tipo de teste tautológico apontado pela revisão
+  // adversarial desta suíte. O primeiro avanço de 0ms existe para deixar os
+  // microtasks da transação e da verificação falsa resolverem antes de o
+  // setTimeout entrar em cena.
+  // ---------------------------------------------
   it('completeAtLeast mantém a promessa pendente até o mínimo configurado e só resolve/rejeita depois', async () => {
-    // Timers falsos de verdade, não um spy que executa o callback na hora:
-    // um spy como esse provaria só que setTimeout foi chamado, não que o
-    // login realmente esperou — o mesmo tipo de teste tautológico apontado
-    // na revisão adversarial (Codex) desta suíte.
     jest.useFakeTimers();
     try {
       servico = construirServico(200);
@@ -177,7 +186,6 @@ describe('AutenticacaoService — login', () => {
         concluiu = true;
       });
 
-      // deixa os microtasks da transação/verificarFalsa resolverem antes do setTimeout
       await jest.advanceTimersByTimeAsync(0);
       expect(concluiu).toBe(false);
 

@@ -51,6 +51,13 @@ export class PagamentosService {
   // confirmação são duas transações separadas (não uma transação aninhada):
   // é exatamente como funcionaria com um provedor de verdade, que cria a
   // cobrança agora e confirma depois, numa requisição separada.
+  //
+  // Se a confirmação falhar por motivo alheio ao resultado do provedor
+  // (ex.: instabilidade de banco entre uma transação e outra), a tentativa
+  // não pode ficar PENDENTE para sempre — órfã, sem ninguém para
+  // reprocessá-la. O catch a resolve como recusada, o que reaproveita a UX
+  // de cartão recusado: pedido continua PENDENTE, cliente tenta de novo
+  // numa tentativa nova. Achado de revisão adversarial, 2026-09-10.
   // ---------------------------------------------
   async criarIntencao(
     pedidoId: number,
@@ -106,12 +113,6 @@ export class PagamentosService {
     try {
       return await this.processarWebhook(webhookDto, assinatura);
     } catch {
-      // Se a confirmação falhar por motivo alheio ao resultado do provedor
-      // (ex.: instabilidade de banco entre a criação da tentativa e o
-      // processamento do webhook), a tentativa não pode ficar PENDENTE para
-      // sempre — órfã, sem ninguém para reprocessá-la. Resolvida aqui como
-      // recusada (mesma UX de cartão recusado: pedido continua PENDENTE,
-      // cliente tenta de novo com uma tentativa nova).
       pagamentoPendente.status = SituacaoDoPagamento.RECUSADO;
       pagamentoPendente.motivoDeRecusa =
         'Falha ao confirmar o pagamento. Tente novamente.';
@@ -128,6 +129,12 @@ export class PagamentosService {
   // Reentrega do mesmo evento (webhook real reentrega em timeout/instabilidade
   // de rede) é idempotente: a segunda chamada esbarra na violação de
   // unicidade do eventId e devolve o pagamento já resolvido, sem reprocessar.
+  //
+  // Duas saídas antecipadas com o mesmo motivo: uma tentativa que já não
+  // está PENDENTE foi resolvida por outro evento e volta como está, e uma
+  // aprovação que chega com o pedido já fora de PENDENTE perdeu a corrida
+  // para outra tentativa ou para um cancelamento — aprovar aí pagaria o
+  // pedido duas vezes, ou o deixaria PAGO depois de CANCELADO.
   // ---------------------------------------------
   async processarWebhook(
     dto: WebhookDePagamentoDto,
@@ -194,7 +201,6 @@ export class PagamentosService {
         );
       }
       if (pagamento.status !== SituacaoDoPagamento.PENDENTE) {
-        // Resolvido antes por outro evento — idempotente, devolve como está.
         return pagamento;
       }
 
@@ -213,10 +219,6 @@ export class PagamentosService {
         pagamento.motivoDeRecusa =
           'Cartão recusado pela operadora (simulado).';
       } else if (pedido.situacao !== SituacaoDoPedido.PENDENTE) {
-        // Corrida: outra tentativa de pagamento (ou um cancelamento) já
-        // resolveu o pedido enquanto este evento estava a caminho. Aprovar
-        // agora criaria um pedido pago duas vezes ou um PAGO depois de
-        // CANCELADO — esta tentativa perde a corrida.
         pagamento.status = SituacaoDoPagamento.RECUSADO;
         pagamento.motivoDeRecusa =
           'Pedido não estava mais pendente quando o pagamento foi confirmado.';

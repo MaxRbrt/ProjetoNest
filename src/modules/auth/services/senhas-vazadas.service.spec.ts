@@ -57,7 +57,6 @@ describe('SenhasVazadasService', () => {
     expect(fetchEspiao).toHaveBeenCalledTimes(1);
     const urlChamada = fetchEspiao.mock.calls[0][0] as string;
     expect(urlChamada).toBe(`${HIBP_API_URL}/range/${prefix}`);
-    // k-anonimato: nem o hash completo nem a senha podem viajar na URL.
     expect(urlChamada).not.toContain(sha1);
     expect(urlChamada).not.toContain(senha);
   });
@@ -86,13 +85,16 @@ describe('SenhasVazadasService', () => {
     );
   });
 
+  // ---------------------------------------------
+  // Timeout da consulta ao HIBP
+  // O mock só rejeita quando o `signal` recebido em opções realmente aborta,
+  // não de forma incondicional. Isso prova que o serviço repassa um
+  // AbortSignal funcional (via AbortSignal.timeout), e não apenas que o catch
+  // genérico existe: se estaComprometida parasse de repassar o signal ao
+  // fetch, a requisição ficaria pendurada para sempre e o teste travaria por
+  // timeout do próprio Jest, em vez de passar.
+  // ---------------------------------------------
   it('falha fechada quando a requisição nunca responde e o AbortSignal de timeout dispara', async () => {
-    // O mock só rejeita quando o `signal` recebido em opções realmente aborta
-    // — não de forma incondicional. Isso prova que o serviço passa adiante
-    // um AbortSignal funcional (via AbortSignal.timeout), não apenas que o
-    // catch genérico existe: se estaComprometida parasse de repassar o
-    // signal ao fetch, esta requisição ficaria pendurada para sempre e o
-    // teste travaria por timeout do próprio Jest, em vez de passar.
     jest.spyOn(global, 'fetch').mockImplementation((_url, opcoes) => {
       const signal = (opcoes as RequestInit | undefined)?.signal;
       return new Promise((_resolve, reject) => {

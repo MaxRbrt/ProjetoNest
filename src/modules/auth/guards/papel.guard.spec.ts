@@ -8,7 +8,7 @@ import { GuardaDePapel } from './papel.guard';
 // request.user -> request.usuario e quebrou toda rota protegida sem o tsc
 // acusar (o retorno de getRequest<T>() "prova a si mesmo"). O teste central
 // aqui é o Step 3 do plano: a mesma informação sob a chave errada precisa
-// ser tratada como usuário ausente, não aceita silenciosamente.
+// ser tratada como usuário ausente, e não aceita silenciosamente.
 // ---------------------------------------------
 describe('GuardaDePapel', () => {
   function contextoCom(request: unknown): ExecutionContext {
@@ -46,7 +46,6 @@ describe('GuardaDePapel', () => {
 
   it('nega quando o usuário está sob a chave "usuario" em vez de "user" — regressão do rename PT-BR', () => {
     const guard = new GuardaDePapel(reflectorRetornando(['ADMIN']));
-    // Mesmo dado, chave errada: o guard não pode aceitar isso silenciosamente.
     const request = { usuario: { papel: 'ADMIN' } };
     expect(() => guard.canActivate(contextoCom(request))).toThrow(
       ForbiddenException,
