@@ -104,6 +104,38 @@ describe('EnderecosService (integração)', () => {
     expect(principais[0].apelido).toBe('Três');
   });
 
+  it('mantém um único principal quando dois endereços são criados ao mesmo tempo', async () => {
+    await Promise.all(
+      Array.from({ length: 10 }, (_, indice) =>
+        servico.criar(
+          usuarioA.id,
+          dadosDeEndereco({ apelido: `Endereço ${indice}` }),
+        ),
+      ),
+    );
+
+    const principais = (await servico.listar(usuarioA.id)).filter(
+      (endereco) => endereco.principal,
+    );
+
+    expect(principais).toHaveLength(1);
+  });
+
+  it('o banco rejeita dois endereços principais para o mesmo usuário', async () => {
+    await servico.criar(usuarioA.id, dadosDeEndereco({ apelido: 'Primeiro' }));
+
+    await expect(
+      conexao.getRepository(Endereco).save(
+        conexao.getRepository(Endereco).create({
+          ...dadosDeEndereco({ apelido: 'Segundo' }),
+          usuarioId: usuarioA.id,
+          principal: true,
+          complemento: null,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
   it('remover o endereço principal promove o mais recente restante', async () => {
     const primeiro = await servico.criar(usuarioA.id, dadosDeEndereco({ apelido: 'Um' }));
     const segundo = await servico.criar(usuarioA.id, dadosDeEndereco({ apelido: 'Dois' }));

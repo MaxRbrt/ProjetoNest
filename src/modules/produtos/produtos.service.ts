@@ -7,7 +7,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, IsNull, Repository } from 'typeorm';
+import {
+  FindOptionsWhere,
+  ILike,
+  IsNull,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import {
   Paginado,
   resolverPaginacao,
@@ -22,6 +28,13 @@ import { ItemDoPedido } from '../pedidos/entities/item-do-pedido.entity';
 import { ARMAZENAMENTO_DE_IMAGENS } from './imagens/armazenamento-de-imagens';
 import type { ArmazenamentoDeImagens } from './imagens/armazenamento-de-imagens';
 import { detectarTipoDeImagem } from './imagens/deteccao-de-tipo-de-imagem';
+
+function ehViolacaoDeChaveEstrangeira(erro: unknown): boolean {
+  return (
+    erro instanceof QueryFailedError &&
+    (erro.driverError as Error & { code?: string }).code === '23503'
+  );
+}
 
 @Injectable()
 export class ProdutosService {
@@ -126,10 +139,20 @@ export class ProdutosService {
       );
     }
     const nomeDoArquivo = produto.nomeDoArquivoDaImagem;
-    const resultado = await this.repositorioDeProdutos.delete({
-      id,
-      nomeDoArquivoDaImagem: nomeDoArquivo ?? IsNull(),
-    });
+    let resultado;
+    try {
+      resultado = await this.repositorioDeProdutos.delete({
+        id,
+        nomeDoArquivoDaImagem: nomeDoArquivo ?? IsNull(),
+      });
+    } catch (erro) {
+      if (ehViolacaoDeChaveEstrangeira(erro)) {
+        throw new ConflictException(
+          `Não é possível remover o produto ${id}: existem pedidos vinculados a ele`,
+        );
+      }
+      throw erro;
+    }
     if (resultado.affected !== 1) {
       throw new ConflictException(
         `Não é possível remover o produto ${id}: a imagem foi alterada por outra operação`,

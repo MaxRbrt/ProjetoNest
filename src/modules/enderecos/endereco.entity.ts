@@ -57,10 +57,10 @@ export class Endereco {
 
   // ---------------------------------------------
   // Endereço principal
-  // No máximo um por usuário — garantido pelo serviço numa transação, não por
-  // constraint de banco: um índice único parcial exigiria excluir o próprio
-  // registro na comparação, e a janela entre "desmarcar o antigo" e "marcar o
-  // novo" já fica coberta pela transação.
+  // No máximo um por usuário — o índice único parcial no banco é a garantia
+  // final. O serviço também trava o usuário durante a troca para serializar
+  // "desmarcar o antigo" e "marcar o novo" sem devolver erro de unicidade em
+  // uma requisição legítima concorrente.
   // ---------------------------------------------
   @Column({ type: 'boolean', default: false })
   principal: boolean;

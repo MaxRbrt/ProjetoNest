@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Endereco } from './endereco.entity';
 import { CriarEnderecoDto } from './dto/criar-endereco.dto';
 import { AtualizarEnderecoDto } from './dto/atualizar-endereco.dto';
+import { Usuario } from '../usuarios/usuario.entity';
 
 @Injectable()
 export class EnderecosService {
@@ -48,6 +49,7 @@ export class EnderecosService {
   async criar(usuarioId: string, dto: CriarEnderecoDto): Promise<Endereco> {
     return this.repositorioDeEnderecos.manager.transaction(
       async (manager) => {
+        await this.bloquearUsuario(manager, usuarioId);
         const repositorio = manager.getRepository(Endereco);
         const nenhumAinda =
           (await repositorio.count({ where: { usuarioId } })) === 0;
@@ -81,6 +83,7 @@ export class EnderecosService {
   ): Promise<Endereco> {
     return this.repositorioDeEnderecos.manager.transaction(
       async (manager) => {
+        await this.bloquearUsuario(manager, usuarioId);
         const repositorio = manager.getRepository(Endereco);
         const endereco = await repositorio.findOne({
           where: { id, usuarioId },
@@ -106,6 +109,7 @@ export class EnderecosService {
   // ---------------------------------------------
   async remover(id: number, usuarioId: string): Promise<void> {
     await this.repositorioDeEnderecos.manager.transaction(async (manager) => {
+      await this.bloquearUsuario(manager, usuarioId);
       const repositorio = manager.getRepository(Endereco);
       const endereco = await repositorio.findOne({ where: { id, usuarioId } });
       if (!endereco) {
@@ -135,5 +139,18 @@ export class EnderecosService {
       { usuarioId, principal: true },
       { principal: false },
     );
+  }
+
+  private async bloquearUsuario(
+    manager: EntityManager,
+    usuarioId: string,
+  ): Promise<void> {
+    const usuario = await manager.findOne(Usuario, {
+      where: { id: usuarioId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!usuario) {
+      throw new NotFoundException(`Usuário ${usuarioId} não encontrado`);
+    }
   }
 }

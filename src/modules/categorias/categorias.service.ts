@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import {
   Paginado,
   resolverPaginacao,
@@ -15,6 +15,13 @@ import { Categoria } from './categoria.entity';
 import { CriarCategoriaDto } from './dto/criar-categoria.dto';
 import { AtualizarCategoriaDto } from './dto/atualizar-categoria.dto';
 import { Produto } from '../produtos/produto.entity';
+
+function ehViolacaoDeChaveEstrangeira(erro: unknown): boolean {
+  return (
+    erro instanceof QueryFailedError &&
+    (erro.driverError as Error & { code?: string }).code === '23503'
+  );
+}
 
 @Injectable()
 export class CategoriasService {
@@ -85,6 +92,15 @@ export class CategoriasService {
         `Não é possível remover a categoria ${id}: existem produtos vinculados a ela`,
       );
     }
-    await this.repositorioDeCategorias.remove(categoria);
+    try {
+      await this.repositorioDeCategorias.remove(categoria);
+    } catch (erro) {
+      if (ehViolacaoDeChaveEstrangeira(erro)) {
+        throw new ConflictException(
+          `Não é possível remover a categoria ${id}: existem produtos vinculados a ela`,
+        );
+      }
+      throw erro;
+    }
   }
 }

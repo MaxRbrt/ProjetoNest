@@ -20,12 +20,14 @@ respostas com tempo mínimo constante para não vazar existência de conta por d
 
 **Catálogo** — produtos e categorias com CRUD completo. Leitura liberada a qualquer usuário
 autenticado; escrita restrita a administradores. Listagens paginadas, com filtro por categoria e
-busca por nome.
+busca por nome; administradores também enviam, substituem e removem a imagem de cada produto.
 
-**Pedidos** — criação transacional com baixa de estoque sob lock pessimista, idempotência via
+**Entrega, pedidos e pagamentos** — endereços por usuário, cotação de frete no servidor, criação
+transacional com baixa de estoque sob lock pessimista, idempotência via
 cabeçalho `Idempotency-Key` (um retry de rede não duplica pedido nem baixa estoque duas vezes), e
 ciclo de vida `PENDENTE → PAGO → CANCELADO` com estorno de estoque no cancelamento. Cada cliente só
-enxerga e altera os próprios pedidos.
+enxerga e altera os próprios pedidos. Pagamentos simulados guardam apenas os quatro últimos dígitos
+do cartão e confirmam o pedido por webhook HMAC idempotente.
 
 ## Requisitos
 
@@ -117,11 +119,18 @@ Documentação completa e navegável em `/docs` (desligada quando `NODE_ENV=prod
 | `GET` | `/auth/me` | autenticado |
 | `GET` | `/products`, `/products/:id` | autenticado |
 | `POST` `PATCH` `DELETE` | `/products`, `/products/:id` | **ADMIN** |
+| `POST` `DELETE` | `/products/:id/image` | **ADMIN** |
+| `GET` | `/products/:id/image` | público |
 | `GET` | `/categories`, `/categories/:id` | autenticado |
 | `POST` `PATCH` `DELETE` | `/categories`, `/categories/:id` | **ADMIN** |
+| `GET` `POST` | `/addresses` | autenticado, somente os próprios |
+| `GET` `PATCH` `DELETE` | `/addresses/:id` | autenticado, somente os próprios |
+| `POST` | `/shipping/quote` | autenticado |
 | `GET` | `/orders`, `/orders/:id` | autenticado (só os próprios; ADMIN vê todos) |
 | `POST` | `/orders` | autenticado |
 | `PATCH` | `/orders/:id/status` | dono ou ADMIN, conforme a transição |
+| `POST` `GET` | `/orders/:id/payments` | autenticado, conforme dono ou ADMIN |
+| `POST` | `/payments/webhook` | público, assinatura HMAC obrigatória |
 
 ### Paginação
 
@@ -164,7 +173,10 @@ src/
    ├─ usuarios/         entidade de usuário e projeção pública
    ├─ produtos/         catálogo de produtos
    ├─ categorias/       catálogo de categorias
+   ├─ enderecos/        endereços de entrega
+   ├─ frete/            cotação de frete
    ├─ pedidos/          pedidos, itens e ciclo de vida
+   ├─ pagamentos/       intenções e webhook de pagamento
    └─ email/            envio transacional via Resend
 ```
 
