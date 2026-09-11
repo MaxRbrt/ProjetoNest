@@ -67,3 +67,6 @@ o
 
 # Emails gravados pelo provedor de desenvolvimento (contêm link de verificação em claro)
 .emails-dev/
+
+# Imagens de produto enviadas em desenvolvimento (dados de teste)
+uploads/

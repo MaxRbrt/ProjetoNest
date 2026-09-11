@@ -15,6 +15,7 @@ const REQUIRED_KEYS = [
   'EMAIL_FROM',
   'FRONTEND_URL',
   'PAYMENT_WEBHOOK_SECRET',
+  'UPLOAD_DIR',
 ] as const;
 
 const PLACEHOLDER_PATTERN = /(replace|placeholder|change[-_ ]?me)/i;
