@@ -11,13 +11,13 @@ terceirizar para serviços que escondam o funcionamento.
 
 ## Estado atual
 
-Backend com o núcleo completo. Última atualização: 2026-09-08.
+Backend com o núcleo completo. Última atualização: 2026-09-11.
 
 | Área | Estado |
 |---|---|
 | Autenticação | Completa — cadastro, verificação de email, login, refresh rotativo, logout, recuperação de senha, Argon2, checagem HIBP, throttling, sessões revogáveis, `no-store`, `OriginGuard` |
 | Autorização | Completa — guard global (toda rota nasce protegida), `@Public()`, `@Roles()`, ownership de pedido, promoção a admin fora da API |
-| Catálogo | Produtos e categorias com CRUD completo, listagem paginada, filtro por categoria e busca por nome |
+| Catálogo | Produtos e categorias com CRUD completo, listagem paginada, filtro por categoria e busca por nome, uma imagem por produto com upload administrativo e entrega pública segura |
 | Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento, listagem com filtro opcional por `situacao` |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
 | Documentação da API | OpenAPI em `/docs`, desligado quando `NODE_ENV=production` |
@@ -25,7 +25,7 @@ Backend com o núcleo completo. Última atualização: 2026-09-08.
 | Endereços | Módulo `enderecos` completo (CRUD, um principal por usuário) + snapshot congelado no pedido — ver seção própria, 2026-09-09 |
 | Frete | Módulo `frete`, cálculo **simulado** determinístico por região + quantidade, custo sempre recalculado no servidor na criação do pedido — ver seção própria, 2026-09-09 |
 | Pagamento | Módulo `pagamentos`, provedor **simulado**, webhook assinado (HMAC) e idempotente, ciclo `PENDENTE→PAGO→ENVIADO→ENTREGUE` — ver seção própria, 2026-09-09/10 |
-| Testes | 68 unitários (`npm test`) + 34 de integração contra Postgres real em container (`npm run test:integration`, cobre sessões, dinheiro, endereços, frete e pagamento/webhook). Demais módulos sem cobertura — ver dívidas |
+| Testes | 90 unitários (`npm test`) + 47 de integração contra Postgres real em container (`npm run test:integration`, cobre sessões, dinheiro, endereços, frete, pagamento/webhook e imagem de produto) |
 
 ## Decisões que não são óbvias no código
 
@@ -569,6 +569,33 @@ categoria e produto como ADMIN, criar pedido, transição de situação PENDENTE
   individual. Rodar por tarefa é desperdício; rodar zero vezes deixa mudança de auth sem segunda
   opinião. Nas quatro vezes que rodou neste projeto, achou problema real — inclusive de severidade
   alta. **Não declarar trabalho pronto antes de a revisão responder.**
+
+## Imagem de produto — 2026-09-11
+
+`Produto.nomeDoArquivoDaImagem` guarda somente um UUID mais extensão (`jpg`, `png` ou `webp`), na
+coluna anulável `products.imageFileName`. O upload em `POST /products/:id/image` é exclusivo de
+ADMIN e aceita até 2 MB no campo `imagem`; o Multer recusa campos de texto extras, múltiplos
+arquivos e partes excedentes antes de acumulá-los em memória.
+
+O servidor detecta JPEG, PNG e WebP pelos bytes, nunca pelo mimetype declarado. SVG, executável
+disfarçado e WAV disfarçado de WebP são recusados. O nome vem de `randomUUID()` e é validado por
+regex também em leitura e remoção, portanto valor adulterado no banco não vira caminho de disco.
+
+Trocar imagem segue grava → aponta a coluna → apaga a anterior. A coluna é atualizada de forma
+condicional pelo nome que foi lido: uploads, remoções e exclusão de produto concorrentes não podem
+restaurar referência antiga nem deixar o arquivo vencedor sem referência. Quem perde a corrida
+recebe 409 e a própria imagem recém-gravada é removida. Falha de limpeza posterior só gera log,
+pois a operação principal já persistiu corretamente.
+
+`GET /products/:id/image` é público porque `<img>` não envia `Authorization`. O `Content-Type` vem
+do conteúdo identificado pelo servidor; a resposta usa `Cross-Origin-Resource-Policy: cross-origin`
+para substituir o `same-origin` global do Helmet, além de `nosniff` e cache público de 300 segundos.
+O `FiltroDeErroDeUpload` captura `PayloadTooLargeException`: o `FileInterceptor` já converte o erro
+do Multer antes de filtros, achado no clique real e coberto por teste HTTP com Supertest.
+
+Validação final: 90 testes unitários, 47 integrações com Postgres e disco reais, TypeScript limpo e
+varredura de comentários fora das caixas vazia. O banco de desenvolvimento foi limpo dos dados do
+clique real e o diretório de uploads ficou vazio.
 
 ## Regras duras da sessão
 
