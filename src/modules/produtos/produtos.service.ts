@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
+  FindOptionsOrder,
   FindOptionsWhere,
   ILike,
   IsNull,
@@ -49,13 +50,16 @@ export class ProdutosService {
   ) {}
 
   // ---------------------------------------------
-  // Listagem paginada de produtos, com filtro e busca
+  // Listagem paginada de produtos, com filtro, busca e ordenação
   // Os filtros entram no where e não em memória: filtrar depois de paginar
   // devolveria página incompleta e um total que não corresponde ao resultado.
   // Nome em branco é tratado como filtro ausente, para que um campo de busca
-  // vazio na vitrine não vire uma busca por espaço. A ordenação por id é
-  // obrigatória: sem ORDER BY o Postgres não garante ordem entre consultas, e
-  // o mesmo produto poderia aparecer em duas páginas ou sumir de todas.
+  // vazio na vitrine não vire uma busca por espaço. A ordenação também vem do
+  // banco pelo mesmo motivo: reordenar em memória só reordenaria a página já
+  // carregada, não o catálogo inteiro. O desempate por id é obrigatório em
+  // qualquer critério: sem ele, dois produtos de mesmo preço (ou mesmo nome)
+  // podem trocar de posição entre consultas, e o mesmo produto aparecer em
+  // duas páginas ou sumir de todas.
   // ---------------------------------------------
   async listar(query: ConsultaDeProdutosDto): Promise<Paginado<Produto>> {
     const { pagina, limite, skip, take } = resolverPaginacao(query);
@@ -69,9 +73,17 @@ export class ProdutosService {
       where.nome = ILike(`%${nome}%`);
     }
 
+    const direcao = query.direcao === 'desc' ? 'DESC' : 'ASC';
+    const order: FindOptionsOrder<Produto> =
+      query.ordenarPor === 'preco'
+        ? { precoEmCentavos: direcao, id: 'ASC' }
+        : query.ordenarPor === 'nome'
+          ? { nome: direcao, id: 'ASC' }
+          : { id: 'ASC' };
+
     const [dados, total] = await this.repositorioDeProdutos.findAndCount({
       where,
-      order: { id: 'ASC' },
+      order,
       skip,
       take,
     });

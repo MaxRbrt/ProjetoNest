@@ -18,8 +18,8 @@ respostas com tempo mínimo constante para não vazar existência de conta por d
 única forma de liberar, o que torna a exceção explícita e auditável. Papéis `ADMIN` e `CLIENTE` via
 `@Roles()`. O papel nunca vem da requisição — só um script administrativo promove alguém.
 
-**Catálogo** — produtos e categorias com CRUD completo. Leitura liberada a qualquer usuário
-autenticado; escrita restrita a administradores. Listagens paginadas, com filtro por categoria e
+**Catálogo** — produtos e categorias com CRUD completo. Leitura pública, sem token;
+escrita restrita a administradores. Listagens paginadas, com filtro por categoria e
 busca por nome; administradores também enviam, substituem e removem a imagem de cada produto.
 
 **Entrega, pedidos e pagamentos** — endereços por usuário, cotação de frete no servidor, criação
@@ -121,7 +121,7 @@ Documentação completa e navegável em `/docs` (desligada quando `NODE_ENV=prod
 | `POST` `PATCH` `DELETE` | `/products`, `/products/:id` | **ADMIN** |
 | `POST` `DELETE` | `/products/:id/image` | **ADMIN** |
 | `GET` | `/products/:id/image` | público |
-| `GET` | `/categories`, `/categories/:id` | autenticado |
+| `GET` | `/categories`, `/categories/:id` | público |
 | `POST` `PATCH` `DELETE` | `/categories`, `/categories/:id` | **ADMIN** |
 | `GET` `POST` | `/addresses` | autenticado, somente os próprios |
 | `GET` `PATCH` `DELETE` | `/addresses/:id` | autenticado, somente os próprios |

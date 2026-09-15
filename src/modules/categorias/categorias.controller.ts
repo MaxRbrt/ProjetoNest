@@ -20,10 +20,15 @@ import { CriarCategoriaDto } from './dto/criar-categoria.dto';
 import { AtualizarCategoriaDto } from './dto/atualizar-categoria.dto';
 import { Papeis } from '../../decorators/papeis.decorator';
 import { Papel } from '../usuarios/usuario.entity';
+import { Publico } from '../../decorators/publico.decorator';
 
 // ---------------------------------------------
 // Catálogo de categorias
-// Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
+// Leitura pública pelo mesmo motivo de GET /products: a vitrine navega por
+// categoria (cabeçalho, menu e filtro) antes de qualquer login, e sem isso o
+// visitante recebe 401 e vê a navegação vazia. A entidade só expõe id e nome;
+// a relação com produtos não é carregada. @Publico() fica em cada leitura, não
+// na classe, para que criar, alterar e remover sigam exigindo token e ADMIN.
 // ---------------------------------------------
 @ApiBearerAuth('access-token')
 @Controller('categories')
@@ -33,6 +38,7 @@ export class CategoriasController {
   // ---------------------------------------------
   // Listagem de categorias
   // ---------------------------------------------
+  @Publico()
   @Get()
   @ApiPaginatedResponse(Categoria)
   listar(@Query() query: ConsultaPaginadaDto): Promise<Paginado<Categoria>> {
@@ -42,6 +48,7 @@ export class CategoriasController {
   // ---------------------------------------------
   // Consulta de categoria por identificador
   // ---------------------------------------------
+  @Publico()
   @Get(':id')
   buscarPorId(@Param('id', ParseIntPipe) id: number): Promise<Categoria> {
     return this.categoriasService.buscarPorId(id);

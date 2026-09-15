@@ -33,7 +33,10 @@ import { FiltroDeErroDeUpload } from './imagens/filtro-de-erro-de-upload';
 
 // ---------------------------------------------
 // Catálogo de produtos
-// Leitura liberada a qualquer usuário autenticado; escrita restrita a ADMIN.
+// Leitura pública, sem exigir token: o catálogo é a vitrine da loja e precisa
+// ser navegável por visitante, antes de qualquer cadastro. Criar, alterar e
+// remover continuam restritos a ADMIN por @Papeis(Papel.ADMIN) — a vitrine é
+// aberta, o estoque de quem a mantém não.
 // ---------------------------------------------
 @ApiBearerAuth('access-token')
 @Controller('products')
@@ -43,6 +46,7 @@ export class ProdutosController {
   // ---------------------------------------------
   // Listagem de produtos
   // ---------------------------------------------
+  @Publico()
   @Get()
   @ApiPaginatedResponse(Produto)
   listar(@Query() query: ConsultaDeProdutosDto): Promise<Paginado<Produto>> {
@@ -124,6 +128,7 @@ export class ProdutosController {
   // ---------------------------------------------
   // Consulta de produto por identificador
   // ---------------------------------------------
+  @Publico()
   @Get(':id')
   buscarPorId(@Param('id', ParseIntPipe) id: number): Promise<Produto> {
     return this.produtosService.buscarPorId(id);
