@@ -38,7 +38,12 @@ export class Produto {
   @Column({ name: 'stock' })
   estoque: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: true, name: 'imageFileName' })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'imageFileName',
+  })
   nomeDoArquivoDaImagem: string | null;
 
   // ---------------------------------------------

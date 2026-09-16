@@ -22,7 +22,17 @@ describe('detectarTipoDeImagem', () => {
   });
 
   it('reconhece PNG', () => {
-    const conteudo = bufferDe(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00);
+    const conteudo = bufferDe(
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+      0x00,
+    );
     expect(detectarTipoDeImagem(conteudo)).toEqual({
       extensao: 'png',
       contentType: 'image/png',
@@ -51,7 +61,10 @@ describe('detectarTipoDeImagem', () => {
   });
 
   it('recusa SVG', () => {
-    const conteudo = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'utf8');
+    const conteudo = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      'utf8',
+    );
     expect(detectarTipoDeImagem(conteudo)).toBeNull();
   });
 

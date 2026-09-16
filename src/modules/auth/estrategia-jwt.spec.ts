@@ -31,7 +31,10 @@ describe('EstrategiaJwt', () => {
 
   beforeEach(() => {
     sessions = { validarSessaoAtiva: jest.fn() };
-    estrategia = new EstrategiaJwt(config, sessions as unknown as SessoesService);
+    estrategia = new EstrategiaJwt(
+      config,
+      sessions as unknown as SessoesService,
+    );
   });
 
   it('rejeita payload sem sub, sem consultar SessoesService', () => {

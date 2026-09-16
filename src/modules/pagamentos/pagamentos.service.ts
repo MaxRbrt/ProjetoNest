@@ -21,7 +21,10 @@ import {
   verificarAssinatura,
   type EventoDePagamento,
 } from './assinatura-de-webhook';
-import { decidirPagamento, ultimosDigitos } from './provedor-de-pagamento-simulado';
+import {
+  decidirPagamento,
+  ultimosDigitos,
+} from './provedor-de-pagamento-simulado';
 
 @Injectable()
 export class PagamentosService {
@@ -64,8 +67,8 @@ export class PagamentosService {
     usuario: UsuarioPublico,
     dto: IniciarPagamentoDto,
   ): Promise<Pagamento> {
-    const pagamentoPendente = await this.repositorioDePedidos.manager.transaction(
-      async (manager) => {
+    const pagamentoPendente =
+      await this.repositorioDePedidos.manager.transaction(async (manager) => {
         const pedido = await manager.findOne(Pedido, {
           where:
             usuario.papel === Papel.ADMIN
@@ -89,8 +92,7 @@ export class PagamentosService {
           motivoDeRecusa: null,
         });
         return manager.save(pagamento);
-      },
-    );
+      });
 
     const { resultado } = decidirPagamento(dto.numeroDoCartao);
     const evento: EventoDePagamento = {
@@ -216,8 +218,7 @@ export class PagamentosService {
 
       if (evento.status === 'RECUSADO') {
         pagamento.status = SituacaoDoPagamento.RECUSADO;
-        pagamento.motivoDeRecusa =
-          'Cartão recusado pela operadora (simulado).';
+        pagamento.motivoDeRecusa = 'Cartão recusado pela operadora (simulado).';
       } else if (pedido.situacao !== SituacaoDoPedido.PENDENTE) {
         pagamento.status = SituacaoDoPagamento.RECUSADO;
         pagamento.motivoDeRecusa =

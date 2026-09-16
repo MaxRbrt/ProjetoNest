@@ -8,7 +8,11 @@ import { PedidosService } from '../../src/modules/pedidos/pedidos.service';
 import { Produto } from '../../src/modules/produtos/produto.entity';
 import { Papel, Usuario } from '../../src/modules/usuarios/usuario.entity';
 import { UsuarioPublico } from '../../src/modules/usuarios/usuarios.service';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 // ---------------------------------------------
 // Congelamento de endereço no pedido, contra Postgres real
@@ -60,7 +64,9 @@ describe('PedidosService — congelamento de endereço (integração)', () => {
 
     const categoria = await conexao
       .getRepository(Categoria)
-      .save(conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }));
+      .save(
+        conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }),
+      );
     produto = await conexao.getRepository(Produto).save(
       conexao.getRepository(Produto).create({
         nome: 'Produto teste',

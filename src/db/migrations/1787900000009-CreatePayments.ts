@@ -65,7 +65,9 @@ export class CreatePayments1787900000009 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "payment_webhook_events"`);
 
     await queryRunner.query(`GRANT ALL ON "payments" TO anon, authenticated`);
-    await queryRunner.query(`ALTER TABLE "payments" DISABLE ROW LEVEL SECURITY`);
+    await queryRunner.query(
+      `ALTER TABLE "payments" DISABLE ROW LEVEL SECURITY`,
+    );
     await queryRunner.query(
       `ALTER TABLE "payments" DROP CONSTRAINT "FK_payments_order"`,
     );

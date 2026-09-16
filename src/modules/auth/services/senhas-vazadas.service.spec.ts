@@ -68,9 +68,9 @@ describe('SenhasVazadasService', () => {
     } as Response);
 
     const servico = new SenhasVazadasService(criarConfigMock());
-    await expect(
-      servico.estaComprometida('senha-nunca-vazada'),
-    ).resolves.toBe(false);
+    await expect(servico.estaComprometida('senha-nunca-vazada')).resolves.toBe(
+      false,
+    );
   });
 
   it('falha fechada (ServiceUnavailableException) quando a API HIBP responde erro HTTP', async () => {
@@ -96,7 +96,7 @@ describe('SenhasVazadasService', () => {
   // ---------------------------------------------
   it('falha fechada quando a requisição nunca responde e o AbortSignal de timeout dispara', async () => {
     jest.spyOn(global, 'fetch').mockImplementation((_url, opcoes) => {
-      const signal = (opcoes as RequestInit | undefined)?.signal;
+      const signal = opcoes?.signal;
       return new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () =>
           reject(new Error('requisição abortada por timeout')),

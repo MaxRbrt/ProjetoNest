@@ -55,7 +55,11 @@ describe('AutenticacaoService — login', () => {
   beforeEach(() => {
     manager = { findOne: jest.fn(), save: jest.fn((u) => Promise.resolve(u)) };
     repositorioDeUsuarios = {
-      manager: { transaction: jest.fn((cb) => cb(manager)) },
+      manager: {
+        transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
+          cb(manager),
+        ),
+      },
     };
     passwords = {
       verify: jest.fn(),
@@ -69,7 +73,9 @@ describe('AutenticacaoService — login', () => {
       criarComGerenciador: jest.fn(),
       complete: jest.fn(),
     };
-    email = { enviarVerificacaoDeEmail: jest.fn().mockResolvedValue(undefined) };
+    email = {
+      enviarVerificacaoDeEmail: jest.fn().mockResolvedValue(undefined),
+    };
     servico = construirServico();
   });
 
@@ -136,15 +142,13 @@ describe('AutenticacaoService — login', () => {
     expect(manager.findOne).toHaveBeenCalledWith(
       Usuario,
       expect.objectContaining({
-        select: expect.objectContaining({ hashDaSenha: true }),
+        select: expect.objectContaining({ hashDaSenha: true }) as unknown,
       }),
     );
   });
 
   it('email não verificado, senha correta: mesma exceção genérica (não vazar que a senha estava certa)', async () => {
-    manager.findOne.mockResolvedValue(
-      usuarioBase({ emailVerificadoEm: null }),
-    );
+    manager.findOne.mockResolvedValue(usuarioBase({ emailVerificadoEm: null }));
     passwords.verify.mockResolvedValue(true);
 
     await expect(servico.login(DTO)).rejects.toThrow(

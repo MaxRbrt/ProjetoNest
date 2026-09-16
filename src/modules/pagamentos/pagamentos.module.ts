@@ -13,7 +13,9 @@ import { EventoDeWebhookProcessado } from './entities/evento-de-webhook-processa
 // travar e ler dentro da própria transação, nenhuma regra de PedidosService.
 // ---------------------------------------------
 @Module({
-  imports: [TypeOrmModule.forFeature([Pedido, Pagamento, EventoDeWebhookProcessado])],
+  imports: [
+    TypeOrmModule.forFeature([Pedido, Pagamento, EventoDeWebhookProcessado]),
+  ],
   controllers: [PagamentosController],
   providers: [PagamentosService],
 })

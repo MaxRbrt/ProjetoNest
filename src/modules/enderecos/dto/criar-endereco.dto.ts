@@ -27,7 +27,7 @@ export class CriarEnderecoDto {
   @MaxLength(120)
   destinatario: string;
 
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.replace(/\D/g, '') : value,
   )
   @Matches(/^\d{8}$/, { message: 'CEP precisa ter 8 dígitos.' })
@@ -58,7 +58,7 @@ export class CriarEnderecoDto {
   @MaxLength(100)
   cidade: string;
 
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.toUpperCase() : value,
   )
   @IsIn(UFS_VALIDAS, { message: 'UF inválida.' })

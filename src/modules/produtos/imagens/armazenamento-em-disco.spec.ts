@@ -1,7 +1,10 @@
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ArmazenamentoEmDisco, nomeDeArquivoEhValido } from './armazenamento-em-disco';
+import {
+  ArmazenamentoEmDisco,
+  nomeDeArquivoEhValido,
+} from './armazenamento-em-disco';
 
 // ---------------------------------------------
 // Armazenamento em disco
@@ -69,13 +72,15 @@ describe('ArmazenamentoEmDisco', () => {
     const alvo = join(diretorio, '..', 'alvo-fora-do-diretorio.txt');
     await writeFile(alvo, 'conteudo que não pode ser lido nem apagado');
 
-    await expect(armazenamento.ler('../alvo-fora-do-diretorio.txt')).rejects.toThrow(
-      /nome de arquivo/i,
+    await expect(
+      armazenamento.ler('../alvo-fora-do-diretorio.txt'),
+    ).rejects.toThrow(/nome de arquivo/i);
+    await expect(
+      armazenamento.apagar('../alvo-fora-do-diretorio.txt'),
+    ).rejects.toThrow(/nome de arquivo/i);
+    await expect(readFile(alvo, 'utf8')).resolves.toContain(
+      'não pode ser lido',
     );
-    await expect(armazenamento.apagar('../alvo-fora-do-diretorio.txt')).rejects.toThrow(
-      /nome de arquivo/i,
-    );
-    await expect(readFile(alvo, 'utf8')).resolves.toContain('não pode ser lido');
   });
 
   it('recusa extensão que escaparia do diretório', async () => {
@@ -93,15 +98,25 @@ describe('ArmazenamentoEmDisco', () => {
 
 describe('nomeDeArquivoEhValido', () => {
   it('aceita o formato gerado pelo próprio armazenamento', () => {
-    expect(nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.jpg')).toBe(true);
-    expect(nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.png')).toBe(true);
-    expect(nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.webp')).toBe(true);
+    expect(
+      nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.jpg'),
+    ).toBe(true);
+    expect(
+      nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.png'),
+    ).toBe(true);
+    expect(
+      nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.webp'),
+    ).toBe(true);
   });
 
   it('recusa travessia de caminho, extensão estranha e vazio', () => {
     expect(nomeDeArquivoEhValido('../etc/passwd')).toBe(false);
-    expect(nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.svg')).toBe(false);
-    expect(nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.png/../x')).toBe(false);
+    expect(
+      nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.svg'),
+    ).toBe(false);
+    expect(
+      nomeDeArquivoEhValido('6f1c2f3a-1111-4222-8333-444455556666.png/../x'),
+    ).toBe(false);
     expect(nomeDeArquivoEhValido('')).toBe(false);
   });
 });

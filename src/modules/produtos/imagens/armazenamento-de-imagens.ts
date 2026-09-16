@@ -1,4 +1,3 @@
-
 // ---------------------------------------------
 // Contrato de armazenamento de imagens
 // O serviço de produtos não sabe onde o arquivo mora. Trocar disco por S3 ou

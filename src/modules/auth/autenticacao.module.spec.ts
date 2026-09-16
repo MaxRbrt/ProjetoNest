@@ -31,7 +31,9 @@ describe('AutenticacaoModule', () => {
     const configMock: Partial<ConfigService> = {
       getOrThrow: jest.fn((chave: string) => {
         if (!(chave in valoresDeConfig)) {
-          throw new Error(`chave de config não prevista no smoke test: ${chave}`);
+          throw new Error(
+            `chave de config não prevista no smoke test: ${chave}`,
+          );
         }
         return valoresDeConfig[chave];
       }),

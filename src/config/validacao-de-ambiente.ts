@@ -149,7 +149,10 @@ export function validarAmbiente(input: Environment): Environment {
   // confirmação de pagamento sem nunca ter cobrado ninguém.
   // ---------------------------------------------
   const paymentWebhookSecret = asText(environment.PAYMENT_WEBHOOK_SECRET);
-  if (paymentWebhookSecret && Buffer.byteLength(paymentWebhookSecret, 'utf8') < 32) {
+  if (
+    paymentWebhookSecret &&
+    Buffer.byteLength(paymentWebhookSecret, 'utf8') < 32
+  ) {
     errors.push('PAYMENT_WEBHOOK_SECRET deve ter pelo menos 32 bytes');
   } else if (
     paymentWebhookSecret &&

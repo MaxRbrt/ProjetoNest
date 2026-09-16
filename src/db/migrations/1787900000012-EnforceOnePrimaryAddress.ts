@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class EnforceOnePrimaryAddress1787900000012
-  implements MigrationInterface
-{
+export class EnforceOnePrimaryAddress1787900000012 implements MigrationInterface {
   name = 'EnforceOnePrimaryAddress1787900000012';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

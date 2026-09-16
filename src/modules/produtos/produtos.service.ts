@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { DeleteResult } from 'typeorm';
 import {
   FindOptionsOrder,
   FindOptionsWhere,
@@ -151,7 +152,7 @@ export class ProdutosService {
       );
     }
     const nomeDoArquivo = produto.nomeDoArquivoDaImagem;
-    let resultado;
+    let resultado: DeleteResult;
     try {
       resultado = await this.repositorioDeProdutos.delete({
         id,
@@ -219,12 +220,15 @@ export class ProdutosService {
 
     const anterior = produto.nomeDoArquivoDaImagem;
     const nomeNovo = await this.armazenamento.gravar(conteudo, tipo.extensao);
-    const resultado = await this.repositorioDeProdutos.update({
-      id,
-      nomeDoArquivoDaImagem: anterior ?? IsNull(),
-    }, {
-      nomeDoArquivoDaImagem: nomeNovo,
-    });
+    const resultado = await this.repositorioDeProdutos.update(
+      {
+        id,
+        nomeDoArquivoDaImagem: anterior ?? IsNull(),
+      },
+      {
+        nomeDoArquivoDaImagem: nomeNovo,
+      },
+    );
     if (resultado.affected !== 1) {
       await this.apagarImagemComTolerancia(nomeNovo);
       const aindaExiste = await this.repositorioDeProdutos.existsBy({ id });
@@ -256,12 +260,15 @@ export class ProdutosService {
   async removerImagem(id: number): Promise<Produto> {
     const produto = await this.buscarPorId(id);
     const anterior = produto.nomeDoArquivoDaImagem;
-    const resultado = await this.repositorioDeProdutos.update({
-      id,
-      nomeDoArquivoDaImagem: anterior ?? IsNull(),
-    }, {
-      nomeDoArquivoDaImagem: null,
-    });
+    const resultado = await this.repositorioDeProdutos.update(
+      {
+        id,
+        nomeDoArquivoDaImagem: anterior ?? IsNull(),
+      },
+      {
+        nomeDoArquivoDaImagem: null,
+      },
+    );
     if (resultado.affected !== 1) {
       throw new ConflictException(
         `A imagem do produto ${id} foi alterada por outra operação. Atualize e tente novamente.`,

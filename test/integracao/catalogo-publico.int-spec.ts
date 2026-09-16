@@ -1,11 +1,14 @@
-import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { Categoria } from '../../src/modules/categorias/categoria.entity';
 import { CategoriasService } from '../../src/modules/categorias/categorias.service';
 import { ArmazenamentoEmDisco } from '../../src/modules/produtos/imagens/armazenamento-em-disco';
 import { Produto } from '../../src/modules/produtos/produto.entity';
 import { ProdutosService } from '../../src/modules/produtos/produtos.service';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -128,7 +131,9 @@ describe('Catálogo — ordenação (integração)', () => {
       pagina.dados.filter((p) => p.nome === 'Teclado').map((p) => p.id);
 
     expect(idsDosTeclados(primeira)).toHaveLength(2);
-    expect(idsDosTeclados(primeira)).toEqual([...idsDosTeclados(primeira)].sort((a, b) => a - b));
+    expect(idsDosTeclados(primeira)).toEqual(
+      [...idsDosTeclados(primeira)].sort((a, b) => a - b),
+    );
     expect(idsDosTeclados(segunda)).toEqual(idsDosTeclados(primeira));
   });
 });

@@ -1,6 +1,10 @@
 import { DataSource, QueryRunner } from 'typeorm';
 import { MoneyToCents1787900000006 } from '../../src/db/migrations/1787900000006-MoneyToCents';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 // ---------------------------------------------
 // Migration de dinheiro para centavos
@@ -60,8 +64,9 @@ describe('MoneyToCents (integração)', () => {
 
     await migration.up(runner);
 
-    const linhas: Array<{ id: number; priceInCents: number }> =
-      await runner.query(`SELECT id, "priceInCents" FROM products ORDER BY id`);
+    const linhas = (await runner.query(
+      `SELECT id, "priceInCents" FROM products ORDER BY id`,
+    )) as Array<{ id: number; priceInCents: number }>;
 
     expect(linhas).toEqual([
       { id: 901, priceInCents: 1990 },
@@ -89,9 +94,9 @@ describe('MoneyToCents (integração)', () => {
          VALUES (905, 'Tentativa de fração', 19.9, 10, 905)`,
     );
 
-    const linhas: Array<{ priceInCents: number }> = await runner.query(
+    const linhas = (await runner.query(
       `SELECT "priceInCents" FROM products WHERE id = 905`,
-    );
+    )) as Array<{ priceInCents: number }>;
     expect(linhas[0].priceInCents).toBe(20);
   });
 
@@ -106,9 +111,9 @@ describe('MoneyToCents (integração)', () => {
 
     await migration.down(runner);
 
-    const linhas: Array<{ price: number }> = await runner.query(
+    const linhas = (await runner.query(
       `SELECT price FROM products WHERE id = 906`,
-    );
+    )) as Array<{ price: number }>;
     expect(Number(linhas[0].price)).toBeCloseTo(19.9, 5);
 
     await migration.up(runner);

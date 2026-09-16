@@ -21,7 +21,10 @@ function canonicalizar(evento: EventoDePagamento): string {
   return `${evento.eventId}|${evento.pagamentoId}|${evento.pedidoId}|${evento.status}|${evento.timestamp}`;
 }
 
-export function assinarEvento(evento: EventoDePagamento, segredo: string): string {
+export function assinarEvento(
+  evento: EventoDePagamento,
+  segredo: string,
+): string {
   return createHmac('sha256', segredo)
     .update(canonicalizar(evento), 'utf8')
     .digest('hex');

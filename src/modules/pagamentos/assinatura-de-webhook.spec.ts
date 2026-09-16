@@ -8,7 +8,9 @@ import {
 
 const SEGREDO = 'segredo-de-teste-com-32-bytes-no-minimo!';
 
-function eventoDeExemplo(sobrescreve: Partial<EventoDePagamento> = {}): EventoDePagamento {
+function eventoDeExemplo(
+  sobrescreve: Partial<EventoDePagamento> = {},
+): EventoDePagamento {
   return {
     eventId: '11111111-1111-4111-8111-111111111111',
     pagamentoId: 1,
@@ -36,20 +38,22 @@ describe('assinarEvento / verificarAssinatura', () => {
 
   it('rejeita quando qualquer campo do evento muda depois de assinado', () => {
     const evento = eventoDeExemplo();
-    const assinatura = assinarEvento(evento, SEGREDO);
 
     const eventoAdulterado = { ...evento, status: 'APROVADO' as const };
     const eventoOriginalRecusado = { ...evento, status: 'RECUSADO' as const };
     const assinaturaDoRecusado = assinarEvento(eventoOriginalRecusado, SEGREDO);
 
-    expect(verificarAssinatura(eventoAdulterado, assinaturaDoRecusado, SEGREDO)).toBe(
-      false,
-    );
+    expect(
+      verificarAssinatura(eventoAdulterado, assinaturaDoRecusado, SEGREDO),
+    ).toBe(false);
   });
 
   it('rejeita assinatura de segredo diferente (chave errada)', () => {
     const evento = eventoDeExemplo();
-    const assinatura = assinarEvento(evento, 'outro-segredo-completamente-diferente!!');
+    const assinatura = assinarEvento(
+      evento,
+      'outro-segredo-completamente-diferente!!',
+    );
     expect(verificarAssinatura(evento, assinatura, SEGREDO)).toBe(false);
   });
 
@@ -64,9 +68,9 @@ describe('assinarEvento / verificarAssinatura', () => {
     expect(() =>
       verificarAssinatura(evento, 'assinatura-curta-de-mentira', SEGREDO),
     ).not.toThrow();
-    expect(verificarAssinatura(evento, 'assinatura-curta-de-mentira', SEGREDO)).toBe(
-      false,
-    );
+    expect(
+      verificarAssinatura(evento, 'assinatura-curta-de-mentira', SEGREDO),
+    ).toBe(false);
   });
 
   it('duas assinaturas do mesmo evento com o mesmo segredo são idênticas (determinístico)', () => {

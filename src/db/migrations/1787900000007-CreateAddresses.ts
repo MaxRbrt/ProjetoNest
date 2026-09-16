@@ -109,9 +109,7 @@ export class CreateAddresses1787900000007 implements MigrationInterface {
          DROP COLUMN "shippingState"`,
     );
 
-    await queryRunner.query(
-      `GRANT ALL ON "addresses" TO anon, authenticated`,
-    );
+    await queryRunner.query(`GRANT ALL ON "addresses" TO anon, authenticated`);
     await queryRunner.query(
       `ALTER TABLE "addresses" DISABLE ROW LEVEL SECURITY`,
     );

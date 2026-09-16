@@ -18,12 +18,19 @@ import {
   assinarEvento,
   type EventoDePagamento,
 } from '../../src/modules/pagamentos/assinatura-de-webhook';
-import { Pedido, SituacaoDoPedido } from '../../src/modules/pedidos/entities/pedido.entity';
+import {
+  Pedido,
+  SituacaoDoPedido,
+} from '../../src/modules/pedidos/entities/pedido.entity';
 import { PedidosService } from '../../src/modules/pedidos/pedidos.service';
 import { Produto } from '../../src/modules/produtos/produto.entity';
 import { Papel, Usuario } from '../../src/modules/usuarios/usuario.entity';
 import { UsuarioPublico } from '../../src/modules/usuarios/usuarios.service';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 const SEGREDO_DE_TESTE = 'segredo-de-webhook-para-integracao-32bytes!!';
 const CARTAO_APROVADO = '4111111111111111';
@@ -91,7 +98,9 @@ describe('PagamentosService (integração)', () => {
 
     const categoria = await conexao
       .getRepository(Categoria)
-      .save(conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }));
+      .save(
+        conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }),
+      );
     produto = await conexao.getRepository(Produto).save(
       conexao.getRepository(Produto).create({
         nome: 'Produto teste',
@@ -309,7 +318,10 @@ describe('PagamentosService (integração)', () => {
       };
 
       await expect(
-        pagamentosService.processarWebhook(dto, 'assinatura-forjada-por-um-atacante'),
+        pagamentosService.processarWebhook(
+          dto,
+          'assinatura-forjada-por-um-atacante',
+        ),
       ).rejects.toThrow(UnauthorizedException);
 
       const pedidoIntacto = await pedidosService.buscarPorId(

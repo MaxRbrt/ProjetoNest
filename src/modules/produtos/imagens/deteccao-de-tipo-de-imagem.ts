@@ -21,7 +21,12 @@ const ASSINATURA_PNG = Buffer.from([
 ]);
 
 export function detectarTipoDeImagem(conteudo: Buffer): TipoDeImagem | null {
-  if (conteudo.length >= 3 && conteudo[0] === 0xff && conteudo[1] === 0xd8 && conteudo[2] === 0xff) {
+  if (
+    conteudo.length >= 3 &&
+    conteudo[0] === 0xff &&
+    conteudo[1] === 0xd8 &&
+    conteudo[2] === 0xff
+  ) {
     return { extensao: 'jpg', contentType: 'image/jpeg' };
   }
   if (conteudo.length >= 8 && conteudo.subarray(0, 8).equals(ASSINATURA_PNG)) {

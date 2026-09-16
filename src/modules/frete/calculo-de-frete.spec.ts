@@ -50,8 +50,8 @@ describe('calcularOpcaoDeFrete', () => {
   });
 
   it('lança para modalidade inexistente (guarda de defesa, DTO já valida antes)', () => {
-    expect(() =>
-      calcularOpcaoDeFrete('SP', 1, 'MOTOBOY' as never),
-    ).toThrow(/[Mm]odalidade/);
+    expect(() => calcularOpcaoDeFrete('SP', 1, 'MOTOBOY' as never)).toThrow(
+      /[Mm]odalidade/,
+    );
   });
 });

@@ -3,7 +3,11 @@ import { DataSource } from 'typeorm';
 import { Endereco } from '../../src/modules/enderecos/endereco.entity';
 import { EnderecosService } from '../../src/modules/enderecos/enderecos.service';
 import { Papel, Usuario } from '../../src/modules/usuarios/usuario.entity';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 // ---------------------------------------------
 // EnderecosService contra Postgres real
@@ -137,8 +141,14 @@ describe('EnderecosService (integração)', () => {
   });
 
   it('remover o endereço principal promove o mais recente restante', async () => {
-    const primeiro = await servico.criar(usuarioA.id, dadosDeEndereco({ apelido: 'Um' }));
-    const segundo = await servico.criar(usuarioA.id, dadosDeEndereco({ apelido: 'Dois' }));
+    const primeiro = await servico.criar(
+      usuarioA.id,
+      dadosDeEndereco({ apelido: 'Um' }),
+    );
+    const segundo = await servico.criar(
+      usuarioA.id,
+      dadosDeEndereco({ apelido: 'Dois' }),
+    );
 
     await servico.remover(primeiro.id, usuarioA.id);
 
@@ -168,9 +178,9 @@ describe('EnderecosService (integração)', () => {
   it('remover endereço de outro usuário devolve 404 e não remove nada', async () => {
     const enderecoDeA = await servico.criar(usuarioA.id, dadosDeEndereco());
 
-    await expect(
-      servico.remover(enderecoDeA.id, usuarioB.id),
-    ).rejects.toThrow(NotFoundException);
+    await expect(servico.remover(enderecoDeA.id, usuarioB.id)).rejects.toThrow(
+      NotFoundException,
+    );
 
     await expect(
       servico.buscarPorId(enderecoDeA.id, usuarioA.id),

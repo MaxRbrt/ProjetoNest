@@ -2,13 +2,17 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository, UpdateResult } from 'typeorm';
 import { Categoria } from '../../src/modules/categorias/categoria.entity';
 import { CategoriasService } from '../../src/modules/categorias/categorias.service';
 import { ArmazenamentoEmDisco } from '../../src/modules/produtos/imagens/armazenamento-em-disco';
 import { Produto } from '../../src/modules/produtos/produto.entity';
 import { ProdutosService } from '../../src/modules/produtos/produtos.service';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 const PNG = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -57,7 +61,9 @@ describe('Imagem de produto (integração)', () => {
 
     const categoria = await conexao
       .getRepository(Categoria)
-      .save(conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }));
+      .save(
+        conexao.getRepository(Categoria).create({ nome: 'Categoria teste' }),
+      );
     produto = await produtosService.criar({
       nome: 'Produto com foto',
       precoEmCentavos: 5000,
@@ -81,7 +87,9 @@ describe('Imagem de produto (integração)', () => {
     const primeiro = await produtosService.definirImagem(produto.id, PNG);
     const segundo = await produtosService.definirImagem(produto.id, JPEG);
 
-    expect(segundo.nomeDoArquivoDaImagem).not.toBe(primeiro.nomeDoArquivoDaImagem);
+    expect(segundo.nomeDoArquivoDaImagem).not.toBe(
+      primeiro.nomeDoArquivoDaImagem,
+    );
     expect(await readdir(diretorio)).toEqual([segundo.nomeDoArquivoDaImagem]);
   });
 
@@ -155,14 +163,18 @@ describe('Imagem de produto (integração)', () => {
   // estoque 99 gravado pelo concorrente, e este teste falha mostrando 3.
   // ---------------------------------------------
   it('não sobrescreve alteração concorrente de estoque feita durante o upload', async () => {
-    jest.spyOn(armazenamento, 'gravar').mockImplementation(async (conteudo, extensao) => {
-      await conexao.getRepository(Produto).update(produto.id, { estoque: 99 });
-      return ArmazenamentoEmDisco.prototype.gravar.call(
-        armazenamento,
-        conteudo,
-        extensao,
-      );
-    });
+    jest
+      .spyOn(armazenamento, 'gravar')
+      .mockImplementation(async (conteudo, extensao) => {
+        await conexao
+          .getRepository(Produto)
+          .update(produto.id, { estoque: 99 });
+        return ArmazenamentoEmDisco.prototype.gravar.call(
+          armazenamento,
+          conteudo,
+          extensao,
+        ) as Promise<string>;
+      });
 
     await produtosService.definirImagem(produto.id, PNG);
 
@@ -177,12 +189,16 @@ describe('Imagem de produto (integração)', () => {
   // depois que outro fluxo já trocou a imagem, restaura a referência antiga,
   // cujo arquivo acabou de ser apagado. O update parcial precisa preservar a
   // coluna que a edição não recebeu no DTO.
+  // Os spies de save/update abaixo chamam a implementação do protótipo direto
+  // (não `.bind()`/variável extraída) — jest.spyOn cria uma propriedade
+  // própria na instância, o protótipo original nunca é tocado, então isso
+  // nunca recai no próprio mock. `strictBindCallApply` está desligado
+  // (tsconfig.json), então `.call()` sempre tipa como `any` — os casts em
+  // cada retorno reafirmam o tipo real do método original.
   // ---------------------------------------------
   it('não restaura referência de imagem removida por troca concorrente', async () => {
     const primeira = await produtosService.definirImagem(produto.id, PNG);
     const repositorio = conexao.getRepository(Produto);
-    const salvarOriginal = repositorio.save.bind(repositorio);
-    const atualizarOriginal = repositorio.update.bind(repositorio);
     let trocaExecutada = false;
 
     async function trocarImagemNoMeioDaEdicao(): Promise<void> {
@@ -193,12 +209,20 @@ describe('Imagem de produto (integração)', () => {
 
     jest.spyOn(repositorio, 'save').mockImplementation(async (entidade) => {
       await trocarImagemNoMeioDaEdicao();
-      return salvarOriginal(entidade);
+      return Repository.prototype.save.call(
+        repositorio,
+        entidade,
+      ) as Promise<Produto>;
     });
-    jest.spyOn(repositorio, 'update').mockImplementation(async (...argumentos) => {
-      await trocarImagemNoMeioDaEdicao();
-      return atualizarOriginal(...argumentos);
-    });
+    jest
+      .spyOn(repositorio, 'update')
+      .mockImplementation(async (...argumentos) => {
+        await trocarImagemNoMeioDaEdicao();
+        return Repository.prototype.update.call(
+          repositorio,
+          ...argumentos,
+        ) as Promise<UpdateResult>;
+      });
 
     await produtosService.atualizar(produto.id, { nome: 'Produto editado' });
 
@@ -233,19 +257,21 @@ describe('Imagem de produto (integração)', () => {
     });
     let chamadas = 0;
 
-    jest.spyOn(armazenamento, 'gravar').mockImplementation(async (...argumentos) => {
-      chamadas += 1;
-      if (chamadas === 1) {
-        avisarPrimeiraGravacao();
-        await primeiraGravacaoLiberada;
-      } else {
-        avisarSegundaGravacao();
-      }
-      return ArmazenamentoEmDisco.prototype.gravar.call(
-        armazenamento,
-        ...argumentos,
-      );
-    });
+    jest
+      .spyOn(armazenamento, 'gravar')
+      .mockImplementation(async (...argumentos) => {
+        chamadas += 1;
+        if (chamadas === 1) {
+          avisarPrimeiraGravacao();
+          await primeiraGravacaoLiberada;
+        } else {
+          avisarSegundaGravacao();
+        }
+        return ArmazenamentoEmDisco.prototype.gravar.call(
+          armazenamento,
+          ...argumentos,
+        ) as Promise<string>;
+      });
 
     const primeiroUpload = produtosService.definirImagem(produto.id, PNG);
     await primeiraGravacaoEntrou;
@@ -253,10 +279,17 @@ describe('Imagem de produto (integração)', () => {
     await segundaGravacaoEntrou;
     liberarPrimeiraGravacao();
 
-    const resultados = await Promise.allSettled([primeiroUpload, segundoUpload]);
+    const resultados = await Promise.allSettled([
+      primeiroUpload,
+      segundoUpload,
+    ]);
 
-    expect(resultados.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
-    expect(resultados.filter(({ status }) => status === 'rejected')).toHaveLength(1);
+    expect(
+      resultados.filter(({ status }) => status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      resultados.filter(({ status }) => status === 'rejected'),
+    ).toHaveLength(1);
     const recarregado = await produtosService.buscarPorId(produto.id);
     expect(await readdir(diretorio)).toEqual([
       recarregado.nomeDoArquivoDaImagem,

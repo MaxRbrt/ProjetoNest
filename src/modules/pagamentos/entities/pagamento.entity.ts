@@ -54,7 +54,12 @@ export class Pagamento {
   @Column({ type: 'char', length: 4, name: 'cardLastDigits' })
   ultimosDigitosDoCartao: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true, name: 'declineReason' })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'declineReason',
+  })
   motivoDeRecusa: string | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'createdAt' })

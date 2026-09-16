@@ -47,27 +47,28 @@ export class EnderecosService {
   // de ter um pré-selecionado.
   // ---------------------------------------------
   async criar(usuarioId: string, dto: CriarEnderecoDto): Promise<Endereco> {
-    return this.repositorioDeEnderecos.manager.transaction(
-      async (manager) => {
-        await this.bloquearUsuario(manager, usuarioId);
-        const repositorio = manager.getRepository(Endereco);
-        const nenhumAinda =
-          (await repositorio.count({ where: { usuarioId } })) === 0;
-        const principal = dto.principal === true || nenhumAinda;
+    return this.repositorioDeEnderecos.manager.transaction(async (manager) => {
+      await this.bloquearUsuario(manager, usuarioId);
+      const repositorio = manager.getRepository(Endereco);
+      const nenhumAinda =
+        (await repositorio.count({ where: { usuarioId } })) === 0;
+      const principal = dto.principal === true || nenhumAinda;
 
-        if (principal) {
-          await this.desmarcarPrincipais(manager.getRepository(Endereco), usuarioId);
-        }
-
-        const endereco = repositorio.create({
-          ...dto,
-          complemento: dto.complemento ?? null,
+      if (principal) {
+        await this.desmarcarPrincipais(
+          manager.getRepository(Endereco),
           usuarioId,
-          principal,
-        });
-        return repositorio.save(endereco);
-      },
-    );
+        );
+      }
+
+      const endereco = repositorio.create({
+        ...dto,
+        complemento: dto.complemento ?? null,
+        usuarioId,
+        principal,
+      });
+      return repositorio.save(endereco);
+    });
   }
 
   // ---------------------------------------------
@@ -81,25 +82,23 @@ export class EnderecosService {
     usuarioId: string,
     dto: AtualizarEnderecoDto,
   ): Promise<Endereco> {
-    return this.repositorioDeEnderecos.manager.transaction(
-      async (manager) => {
-        await this.bloquearUsuario(manager, usuarioId);
-        const repositorio = manager.getRepository(Endereco);
-        const endereco = await repositorio.findOne({
-          where: { id, usuarioId },
-        });
-        if (!endereco) {
-          throw new NotFoundException(`Endereço ${id} não encontrado`);
-        }
+    return this.repositorioDeEnderecos.manager.transaction(async (manager) => {
+      await this.bloquearUsuario(manager, usuarioId);
+      const repositorio = manager.getRepository(Endereco);
+      const endereco = await repositorio.findOne({
+        where: { id, usuarioId },
+      });
+      if (!endereco) {
+        throw new NotFoundException(`Endereço ${id} não encontrado`);
+      }
 
-        if (dto.principal === true && !endereco.principal) {
-          await this.desmarcarPrincipais(repositorio, usuarioId);
-        }
+      if (dto.principal === true && !endereco.principal) {
+        await this.desmarcarPrincipais(repositorio, usuarioId);
+      }
 
-        Object.assign(endereco, dto);
-        return repositorio.save(endereco);
-      },
-    );
+      Object.assign(endereco, dto);
+      return repositorio.save(endereco);
+    });
   }
 
   // ---------------------------------------------

@@ -57,9 +57,7 @@ export async function limparTabelas(conexao: DataSource): Promise<void> {
     return;
   }
 
-  const alvos = tabelas
-    .map((linha) => `"${linha.tablename}"`)
-    .join(', ');
+  const alvos = tabelas.map((linha) => `"${linha.tablename}"`).join(', ');
 
   await conexao.query(`TRUNCATE TABLE ${alvos} RESTART IDENTITY CASCADE`);
 }

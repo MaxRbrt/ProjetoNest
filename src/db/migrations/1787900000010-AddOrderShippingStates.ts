@@ -23,9 +23,9 @@ export class AddOrderShippingStates1787900000010 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const emUso: Array<{ n: number }> = await queryRunner.query(
+    const emUso = (await queryRunner.query(
       `SELECT COUNT(*)::int AS n FROM "orders" WHERE "status" IN ('ENVIADO', 'ENTREGUE')`,
-    );
+    )) as Array<{ n: number }>;
     if (emUso[0].n > 0) {
       throw new Error(
         'Não é possível reverter AddOrderShippingStates: existem pedidos ' +
@@ -40,7 +40,9 @@ export class AddOrderShippingStates1787900000010 implements MigrationInterface {
     await queryRunner.query(
       `CREATE TYPE "orders_status_enum" AS ENUM('PENDENTE', 'PAGO', 'CANCELADO')`,
     );
-    await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" DROP DEFAULT`);
+    await queryRunner.query(
+      `ALTER TABLE "orders" ALTER COLUMN "status" DROP DEFAULT`,
+    );
     await queryRunner.query(
       `ALTER TABLE "orders" ALTER COLUMN "status" TYPE "orders_status_enum"
          USING "status"::text::"orders_status_enum"`,

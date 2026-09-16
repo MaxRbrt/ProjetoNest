@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { ProdutosController } from './produtos.controller';
 import { ProdutosService } from './produtos.service';
@@ -14,7 +15,7 @@ describe('ProdutosController (upload HTTP)', () => {
   let app: INestApplication;
   const produtosService = {
     listar: jest.fn(),
-    definirImagem: jest.fn(),
+    definirImagem: jest.fn<Promise<unknown>, [id: number, imagem: Buffer]>(),
     removerImagem: jest.fn(),
     lerImagem: jest.fn(),
     buscarPorId: jest.fn(),
@@ -42,7 +43,7 @@ describe('ProdutosController (upload HTTP)', () => {
   });
 
   it('responde 413 em PT-BR quando a imagem excede 2 MB', async () => {
-    const resposta = await request(app.getHttpServer())
+    const resposta = await request(app.getHttpServer() as Server)
       .post('/products/1/image')
       .attach('imagem', Buffer.alloc(3 * 1024 * 1024), 'grande.png');
 
@@ -62,7 +63,7 @@ describe('ProdutosController (upload HTTP)', () => {
     const produto = { id: 1, nomeDoArquivoDaImagem: 'produto.png' };
     produtosService.definirImagem.mockResolvedValue(produto);
 
-    const resposta = await request(app.getHttpServer())
+    const resposta = await request(app.getHttpServer() as Server)
       .post('/products/1/image')
       .attach('imagem', imagem, 'pequena.png');
 
@@ -80,7 +81,7 @@ describe('ProdutosController (upload HTTP)', () => {
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
     ]);
 
-    const resposta = await request(app.getHttpServer())
+    const resposta = await request(app.getHttpServer() as Server)
       .post('/products/1/image')
       .field('descricao', 'x'.repeat(1024))
       .attach('imagem', imagem, 'pequena.png');

@@ -7,7 +7,11 @@ import { TokenDeAcessoService } from '../../src/modules/auth/services/token-de-a
 import { TokenOpacoService } from '../../src/modules/auth/services/token-opaco.service';
 import { Papel, Usuario } from '../../src/modules/usuarios/usuario.entity';
 import { UsuariosService } from '../../src/modules/usuarios/usuarios.service';
-import { abrirBancoDeTeste, fecharBancoDeTeste, limparTabelas } from './ambiente';
+import {
+  abrirBancoDeTeste,
+  fecharBancoDeTeste,
+  limparTabelas,
+} from './ambiente';
 
 // ---------------------------------------------
 // SessoesService contra Postgres real
@@ -69,9 +73,9 @@ describe('SessoesService (integração)', () => {
       const segunda = await servico.refresh(primeira.tokenDeRenovacao);
 
       // reapresenta o token já consumido — sinal de roubo
-      await expect(
-        servico.refresh(primeira.tokenDeRenovacao),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(servico.refresh(primeira.tokenDeRenovacao)).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       // leitura nova, fora de qualquer transação do serviço: a revogação
       // precisa ter sido efetivada no banco, não só no objeto em memória
@@ -83,9 +87,9 @@ describe('SessoesService (integração)', () => {
       expect(sessoes.every((sessao) => sessao.revogadoEm !== null)).toBe(true);
 
       // o token que a rotação tinha acabado de emitir também morre junto
-      await expect(
-        servico.refresh(segunda.tokenDeRenovacao),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(servico.refresh(segunda.tokenDeRenovacao)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 

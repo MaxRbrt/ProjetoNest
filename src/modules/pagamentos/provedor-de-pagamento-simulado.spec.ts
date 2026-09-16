@@ -1,4 +1,7 @@
-import { decidirPagamento, ultimosDigitos } from './provedor-de-pagamento-simulado';
+import {
+  decidirPagamento,
+  ultimosDigitos,
+} from './provedor-de-pagamento-simulado';
 
 describe('decidirPagamento', () => {
   it('recusa cartão terminado em 0002 (cartão de teste de recusa)', () => {

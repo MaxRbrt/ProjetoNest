@@ -21,34 +21,39 @@ import { SessoesService } from './sessoes.service';
 // ---------------------------------------------
 type Registro = Record<string, unknown> & { id: string };
 
-class FakeEntityManager {
-  private readonly tabelas = new Map<Function, Map<string, Registro>>();
-  private readonly tipos = new WeakMap<object, Function>();
+// Representa a classe de uma entidade (Usuario, SessaoDeAutenticacao etc.),
+// usada só como chave de identidade nos mapas abaixo — nunca instanciada
+// diretamente pelo fake, por isso aceita qualquer construtor real do TypeORM.
+type Construtor = abstract new (...args: never[]) => unknown;
 
-  private tabela(Entidade: Function): Map<string, Registro> {
+class FakeEntityManager {
+  private readonly tabelas = new Map<Construtor, Map<string, Registro>>();
+  private readonly tipos = new WeakMap<object, Construtor>();
+
+  private tabela(Entidade: Construtor): Map<string, Registro> {
     if (!this.tabelas.has(Entidade)) this.tabelas.set(Entidade, new Map());
     return this.tabelas.get(Entidade)!;
   }
 
-  private registrar<T extends Registro>(objeto: T, Entidade: Function): T {
+  private registrar<T extends Registro>(objeto: T, Entidade: Construtor): T {
     this.tipos.set(objeto, Entidade);
     return objeto;
   }
 
-  semear(Entidade: Function, registros: Registro[]): void {
+  semear(Entidade: Construtor, registros: Registro[]): void {
     const mapa = this.tabela(Entidade);
     for (const registro of registros) {
       mapa.set(registro.id, this.registrar({ ...registro }, Entidade));
     }
   }
 
-  obterTodos(Entidade: Function): Registro[] {
+  obterTodos(Entidade: Construtor): Registro[] {
     return [...this.tabela(Entidade).values()];
   }
 
   findOne(
-    Entidade: Function,
-    opcoes: { where: Record<string, unknown> },
+    Entidade: Construtor,
+    opcoes: { where: Record<string, unknown>; lock?: unknown },
   ): Promise<Registro | null> {
     const linhas = this.tabela(Entidade);
     for (const linha of linhas.values()) {
@@ -60,7 +65,7 @@ class FakeEntityManager {
     return Promise.resolve(null);
   }
 
-  create(Entidade: Function, dados: Record<string, unknown>): Registro {
+  create(Entidade: Construtor, dados: Record<string, unknown>): Registro {
     const objeto = { id: (dados.id as string) ?? randomUUID(), ...dados };
     return this.registrar(objeto, Entidade);
   }
@@ -77,7 +82,7 @@ class FakeEntityManager {
   }
 
   update(
-    Entidade: Function,
+    Entidade: Construtor,
     criterio: Record<string, unknown>,
     parcial: Record<string, unknown>,
   ): Promise<void> {
@@ -99,9 +104,7 @@ class FakeEntityManager {
     return (valor as { _type?: string })._type === 'isNull';
   }
 
-  transaction<T>(
-    trabalho: (manager: EntityManager) => Promise<T>,
-  ): Promise<T> {
+  transaction<T>(trabalho: (manager: EntityManager) => Promise<T>): Promise<T> {
     return trabalho(this as unknown as EntityManager);
   }
 }
@@ -147,7 +150,7 @@ describe('SessoesService', () => {
       users as unknown as UsuariosService,
     );
 
-    manager.semear(Usuario, [usuarioSeed as unknown as Registro]);
+    manager.semear(Usuario, [usuarioSeed]);
   });
 
   function semearSessaoComToken(opcoes: {
@@ -166,7 +169,7 @@ describe('SessoesService', () => {
         expiraEm: opcoes.sessaoExpiraEm,
         revogadoEm: opcoes.sessaoRevogadoEm ?? null,
         usadaPelaUltimaVezEm: NO_PASSADO,
-      } as unknown as Registro,
+      },
     ]);
     const tokenId = randomUUID();
     manager.semear(TokenDeRenovacao, [
@@ -178,7 +181,7 @@ describe('SessoesService', () => {
         usadoEm: opcoes.tokenUsadoEm ?? null,
         revogadoEm: opcoes.tokenRevogadoEm ?? null,
         substituidoPeloTokenId: null,
-      } as unknown as Registro,
+      },
     ]);
     return { sessaoId, tokenId };
   }
@@ -204,7 +207,9 @@ describe('SessoesService', () => {
       const novo = tokens.find((t) => t.id === antigo.substituidoPeloTokenId)!;
       expect(novo).toBeDefined();
       expect(novo.usadoEm).toBeNull();
-      expect(novo.hashDoToken).toBe(opaqueTokens.hash(resultado.tokenDeRenovacao));
+      expect(novo.hashDoToken).toBe(
+        opaqueTokens.hash(resultado.tokenDeRenovacao),
+      );
 
       const sessoes = manager.obterTodos(SessaoDeAutenticacao);
       const sessao = sessoes.find((s) => s.id === sessaoId)!;
@@ -233,7 +238,7 @@ describe('SessoesService', () => {
           usadoEm: null,
           revogadoEm: null,
           substituidoPeloTokenId: null,
-        } as unknown as Registro,
+        },
       ]);
 
       await expect(servico.refresh(rawTokenReusado, AGORA)).rejects.toThrow(
@@ -296,7 +301,9 @@ describe('SessoesService', () => {
     });
 
     it('token inexistente é inválido com a mesma mensagem (não distingue motivo)', async () => {
-      await expect(servico.refresh('token-que-nunca-existiu', AGORA)).rejects.toThrow(
+      await expect(
+        servico.refresh('token-que-nunca-existiu', AGORA),
+      ).rejects.toThrow(
         new UnauthorizedException('Não foi possível renovar a sessão.'),
       );
     });
@@ -331,6 +338,18 @@ describe('SessoesService', () => {
     });
   });
 
+  // ---------------------------------------------
+  // Ordem de lock — espionar findOne sem recair no próprio mock
+  // Os dois testes abaixo espionam `manager.findOne` para registrar em que
+  // ordem cada entidade é lida sob lock, mas ainda precisam do comportamento
+  // real do método por trás. Chamar `FakeEntityManager.prototype.findOne`
+  // direto (em vez de extrair `manager.findOne` para uma variável, ou usar
+  // `.bind()`) é o que evita recursão: jest.spyOn cria uma propriedade própria
+  // na instância, o protótipo original nunca é tocado. `strictBindCallApply`
+  // está desligado neste projeto (tsconfig.json), então `.call()` sempre tipa
+  // como `any` — o cast em cada retorno reafirma o tipo real do método
+  // original.
+  // ---------------------------------------------
   describe('ordem de lock', () => {
     it('refresh trava na ordem usuário -> sessão -> token', async () => {
       const rawToken = 'token-para-ordem-de-lock';
@@ -340,14 +359,15 @@ describe('SessoesService', () => {
         tokenExpiraEm: NO_FUTURO,
       });
 
-      const chamadasComLock: Function[] = [];
-      const findOneOriginal = manager.findOne.bind(manager);
-      jest
-        .spyOn(manager, 'findOne')
-        .mockImplementation((Entidade, opcoes: any) => {
-          if (opcoes.lock) chamadasComLock.push(Entidade);
-          return findOneOriginal(Entidade, opcoes);
-        });
+      const chamadasComLock: Construtor[] = [];
+      jest.spyOn(manager, 'findOne').mockImplementation((Entidade, opcoes) => {
+        if (opcoes.lock) chamadasComLock.push(Entidade);
+        return FakeEntityManager.prototype.findOne.call(
+          manager,
+          Entidade,
+          opcoes,
+        ) as Promise<Registro | null>;
+      });
 
       await servico.refresh(rawToken, AGORA);
 
@@ -366,14 +386,15 @@ describe('SessoesService', () => {
         tokenExpiraEm: NO_FUTURO,
       });
 
-      const chamadasComLock: Function[] = [];
-      const findOneOriginal = manager.findOne.bind(manager);
-      jest
-        .spyOn(manager, 'findOne')
-        .mockImplementation((Entidade, opcoes: any) => {
-          if (opcoes.lock) chamadasComLock.push(Entidade);
-          return findOneOriginal(Entidade, opcoes);
-        });
+      const chamadasComLock: Construtor[] = [];
+      jest.spyOn(manager, 'findOne').mockImplementation((Entidade, opcoes) => {
+        if (opcoes.lock) chamadasComLock.push(Entidade);
+        return FakeEntityManager.prototype.findOne.call(
+          manager,
+          Entidade,
+          opcoes,
+        ) as Promise<Registro | null>;
+      });
 
       await servico.logout(rawToken, AGORA);
 
@@ -410,7 +431,10 @@ describe('SessoesService', () => {
       );
 
       expect(users.paraUsuarioPublico).toHaveBeenCalledWith(usuarioSeed);
-      expect(resultado).toEqual({ id: usuarioSeed.id, email: usuarioSeed.email });
+      expect(resultado).toEqual({
+        id: usuarioSeed.id,
+        email: usuarioSeed.email,
+      });
     });
   });
 });

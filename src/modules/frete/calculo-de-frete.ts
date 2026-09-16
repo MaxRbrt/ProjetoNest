@@ -9,19 +9,41 @@
 type Regiao = 'NORTE' | 'NORDESTE' | 'CENTRO_OESTE' | 'SUDESTE' | 'SUL';
 
 const REGIAO_POR_UF: Record<string, Regiao> = {
-  AC: 'NORTE', AP: 'NORTE', AM: 'NORTE', PA: 'NORTE', RO: 'NORTE',
-  RR: 'NORTE', TO: 'NORTE',
-  AL: 'NORDESTE', BA: 'NORDESTE', CE: 'NORDESTE', MA: 'NORDESTE',
-  PB: 'NORDESTE', PE: 'NORDESTE', PI: 'NORDESTE', RN: 'NORDESTE',
+  AC: 'NORTE',
+  AP: 'NORTE',
+  AM: 'NORTE',
+  PA: 'NORTE',
+  RO: 'NORTE',
+  RR: 'NORTE',
+  TO: 'NORTE',
+  AL: 'NORDESTE',
+  BA: 'NORDESTE',
+  CE: 'NORDESTE',
+  MA: 'NORDESTE',
+  PB: 'NORDESTE',
+  PE: 'NORDESTE',
+  PI: 'NORDESTE',
+  RN: 'NORDESTE',
   SE: 'NORDESTE',
-  DF: 'CENTRO_OESTE', GO: 'CENTRO_OESTE', MT: 'CENTRO_OESTE', MS: 'CENTRO_OESTE',
-  ES: 'SUDESTE', MG: 'SUDESTE', RJ: 'SUDESTE', SP: 'SUDESTE',
-  PR: 'SUL', RS: 'SUL', SC: 'SUL',
+  DF: 'CENTRO_OESTE',
+  GO: 'CENTRO_OESTE',
+  MT: 'CENTRO_OESTE',
+  MS: 'CENTRO_OESTE',
+  ES: 'SUDESTE',
+  MG: 'SUDESTE',
+  RJ: 'SUDESTE',
+  SP: 'SUDESTE',
+  PR: 'SUL',
+  RS: 'SUL',
+  SC: 'SUL',
 };
 
 export type ModalidadeDeFrete = 'PAC' | 'SEDEX';
 
-export const MODALIDADES_VALIDAS: readonly ModalidadeDeFrete[] = ['PAC', 'SEDEX'];
+export const MODALIDADES_VALIDAS: readonly ModalidadeDeFrete[] = [
+  'PAC',
+  'SEDEX',
+];
 
 interface ParametrosDaModalidade {
   custoBaseEmCentavos: number;
@@ -34,7 +56,10 @@ interface ParametrosDaModalidade {
 // distribuição fictício). Quanto mais distante, maior o custo base e o prazo
 // — mesma direção em PAC e SEDEX, SEDEX sempre mais caro e mais rápido.
 // ---------------------------------------------
-const PARAMETROS: Record<Regiao, Record<ModalidadeDeFrete, ParametrosDaModalidade>> = {
+const PARAMETROS: Record<
+  Regiao,
+  Record<ModalidadeDeFrete, ParametrosDaModalidade>
+> = {
   SUDESTE: {
     PAC: { custoBaseEmCentavos: 1500, prazoBaseEmDiasUteis: 5 },
     SEDEX: { custoBaseEmCentavos: 2800, prazoBaseEmDiasUteis: 2 },

@@ -13,7 +13,6 @@ import {
   resolverPaginacao,
   paraPaginado,
 } from '../../common/dto/paginado';
-import { ConsultaPaginadaDto } from '../../common/dto/consulta-paginada.dto';
 import { Pedido, SituacaoDoPedido } from './entities/pedido.entity';
 import { ItemDoPedido } from './entities/item-do-pedido.entity';
 import { Produto } from '../produtos/produto.entity';
@@ -377,7 +376,9 @@ export class PedidosService {
         where: { id: dto.enderecoId, usuarioId: usuario.id },
       });
       if (!endereco) {
-        throw new NotFoundException(`Endereço ${dto.enderecoId} não encontrado`);
+        throw new NotFoundException(
+          `Endereço ${dto.enderecoId} não encontrado`,
+        );
       }
 
       let subtotalEmCentavos = 0;

@@ -99,6 +99,8 @@ export class MoneyToCents1787900000006 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "products" ALTER COLUMN "price" SET NOT NULL`,
     );
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN "priceInCents"`);
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN "priceInCents"`,
+    );
   }
 }
