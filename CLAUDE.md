@@ -597,6 +597,22 @@ Validação final: 90 testes unitários, 47 integrações com Postgres e disco r
 varredura de comentários fora das caixas vazia. O banco de desenvolvimento foi limpo dos dados do
 clique real e o diretório de uploads ficou vazio.
 
+## Leitura pública do catálogo — 2026-09-15
+
+`GET /products`, `GET /products/:id`, `GET /categories` e `GET /categories/:id` são `@Publico()` por
+método (não na classe do controller) — a criação, atualização e remoção de produto e categoria
+continuam exigindo o guard global e o papel ADMIN, sem exceção. A listagem de produtos aceita
+`ordenarPor` (`'preco' | 'nome'`) e `direcao` (`'asc' | 'desc'`) na query, mapeados para uma coluna
+fixa no service (nunca vira identificador SQL interpolado) e sempre com desempate por `id` para
+paginação estável. Motivo da mudança: o frontend (`projeto-test-web`) passou a servir vitrine,
+detalhe e busca sem exigir sessão do visitante — ver o `CLAUDE.md` do frontend, seção da
+refatoração para Tailwind v4.
+
+Cobertura: `src/modules/categorias/categorias.controller.spec.ts` (8 testes de metadata via
+`Reflector`, cobrindo leitura pública e ausência de exceção de autenticação nas escritas/classe) e
+`test/integracao/catalogo-publico.int-spec.ts` (curl real sem token: listagem e detalhe 200,
+criação 401).
+
 ## Regras duras da sessão
 
 - **Nenhum comando `git` ou `gh` pode ser executado pela sessão**, nem de leitura (`status`, `log`,
