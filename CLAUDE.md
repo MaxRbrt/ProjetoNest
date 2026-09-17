@@ -17,6 +17,7 @@ Backend com o núcleo completo. Última atualização: 2026-09-11.
 |---|---|
 | Autenticação | Completa — cadastro, verificação de email, login, refresh rotativo, logout, recuperação de senha, Argon2, checagem HIBP, throttling, sessões revogáveis, `no-store`, `OriginGuard` |
 | Autorização | Completa — guard global (toda rota nasce protegida), `@Public()`, `@Roles()`, ownership de pedido, promoção a admin fora da API |
+| Métricas | `GET /admin/metricas` (ADMIN) com faturamento, pedidos, ticket médio, taxa de recusa e vendas por dia — 2026-09-16 |
 | Catálogo | Produtos e categorias com CRUD completo, listagem paginada, filtro por categoria e busca por nome, uma imagem por produto com upload administrativo e entrega pública segura |
 | Pedidos | Criação transacional com baixa de estoque e lock pessimista, idempotência por `Idempotency-Key`, ciclo de vida (`PENDENTE`/`PAGO`/`CANCELADO`) com estorno de estoque no cancelamento, listagem com filtro opcional por `situacao` |
 | Persistência | 11 migrations versionadas, `synchronize` desligado, RLS ativo |
@@ -612,6 +613,44 @@ Cobertura: `src/modules/categorias/categorias.controller.spec.ts` (8 testes de m
 `Reflector`, cobrindo leitura pública e ausência de exceção de autenticação nas escritas/classe) e
 `test/integracao/catalogo-publico.int-spec.ts` (curl real sem token: listagem e detalhe 200,
 criação 401).
+
+## Métricas do painel administrativo — 2026-09-16
+
+Spec local (não versionada): `docs/superpowers/specs/2026-09-16-dashboard-admin-metricas-design.md`.
+Módulo `src/modules/metricas/`, rota `GET /admin/metricas?periodo=hoje|7d|30d|90d`, só leitura, só
+ADMIN (`@Papeis(Papel.ADMIN)` na rota + guards globais). Nenhuma migration.
+
+**Definições que valem para qualquer mudança futura:**
+
+- Dia = dia civil de `America/Sao_Paulo`. `hoje` vai da meia-noite até agora; `7d/30d/90d` são os
+  últimos N dias contando hoje. O período **anterior é o atual deslocado N dias para trás**
+  (`[inicio − N dias, fim − N dias)`) — compara o mesmo trecho do ciclo. A primeira versão da spec
+  dizia "janela imediatamente antes", o que contradizia o próprio exemplo; o teste unitário pegou.
+- Faturamento = soma de `totalInCents` de pedidos `PAGO`/`ENVIADO`/`ENTREGUE` pela data do pedido.
+  Pedidos = todos exceto `CANCELADO`. Ticket médio = faturamento ÷ pedidos faturados
+  (`Math.round`, 0 sem faturados). Taxa de recusa = `RECUSADO ÷ (APROVADO + RECUSADO)` pela data do
+  pagamento, `null` sem pagamento concluído (`PENDENTE` fica fora).
+- **`orders.createdAt` é `TIMESTAMP` sem fuso** (gravado em UTC por `DEFAULT now()` numa sessão
+  UTC — conferido com `SHOW timezone` no banco de teste; o Supabase não foi consultado e é premissa)
+  e `payments.createdAt` é `TIMESTAMPTZ`. Toda consulta sobre pedidos usa
+  `("pedido"."createdAt" AT TIME ZONE 'UTC')` antes de comparar ou agrupar. Um teste de mutação
+  confirmou: sem essa conversão, o agrupamento por dia erra e a integração falha.
+- `SUM`/`COUNT` voltam como string (`bigint`); `inteiro()` converte e lança se sair do inteiro
+  seguro. Os trechos SQL são constantes do módulo e todo valor entra por `setParameters`.
+- `janela-de-periodo.ts` é função pura com `agora` injetável; o service recebe `agora` opcional para
+  o teste fixar o relógio. Sem índice em `orders.createdAt`: aceitável no volume atual, revisitar
+  com migration se a tabela crescer.
+
+**Testes:** `janela-de-periodo.spec.ts` (janelas, virada de dia em SP, 90 dias atravessando meses),
+`metricas.controller.spec.ts` (metadado `@Papeis(ADMIN)`, caminho, DTO aceita só a lista fechada),
+`test/integracao/metricas.int-spec.ts` (Postgres real: bordas incluso/excluso, madrugada UTC que
+ainda é o dia anterior em SP, taxa com pendente e `null`, dias zerados). Resultado ao fechar: 116
+unitários, 59 de integração, lint e build limpos.
+
+**Armadilha de ambiente:** `npm run build` apaga e recria `dist/` (`deleteOutDir`); com um
+`start:dev` rodando ao mesmo tempo, a API de desenvolvimento caiu e precisou ser reiniciada. O build
+continua gerando `dist/src/main.js` (raiz ampliada por `jest*.config.ts` e `test/integracao/ambiente.ts`
+fora de `src/`), então `start:prod` segue quebrado como já registrado acima — `nest start` funciona.
 
 ## Regras duras da sessão
 

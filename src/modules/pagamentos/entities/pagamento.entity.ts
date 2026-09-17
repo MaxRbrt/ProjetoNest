@@ -17,11 +17,18 @@ import { Pedido } from '../../pedidos/entities/pedido.entity';
 // histórico da tentativa que falhou. O que impede pagar duas vezes é o
 // pedido não estar mais PENDENTE depois da primeira aprovação — ver
 // PagamentosService.criarIntencao.
+//
+// ESTORNADO é terminal, só alcançável a partir de APROVADO, gravado pelo
+// admin cancelando um pedido PAGO (mesma transação que devolve o estoque —
+// ver PedidosService.atualizarSituacao). Não existe reembolso automático de
+// verdade: o provedor é simulado, então ESTORNADO só marca a intenção; numa
+// integração real seria aqui que entraria a chamada de estorno ao provedor.
 // ---------------------------------------------
 export enum SituacaoDoPagamento {
   PENDENTE = 'PENDENTE',
   APROVADO = 'APROVADO',
   RECUSADO = 'RECUSADO',
+  ESTORNADO = 'ESTORNADO',
 }
 
 @Entity('payments')

@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -8,6 +9,20 @@ import {
 } from 'typeorm';
 import { Categoria } from '../categorias/categoria.entity';
 import { ItemDoPedido } from '../pedidos/entities/item-do-pedido.entity';
+
+// ---------------------------------------------
+// Situação do produto
+// ATIVO aparece no catálogo público e pode ser comprado. ARQUIVADO some das
+// duas coisas sem apagar nada: order_items já congela nome e preço, então
+// nenhum pedido antigo depende do produto continuar ATIVO. Arquivar é a
+// alternativa a um DELETE que a FK de order_items sempre vai recusar quando
+// existir histórico — ver PRODUTOS_COM_HISTORICO_NAO_PODEM_SER_APAGADOS em
+// produtos.service.ts.
+// ---------------------------------------------
+export enum SituacaoDoProduto {
+  ATIVO = 'ATIVO',
+  ARQUIVADO = 'ARQUIVADO',
+}
 
 // ---------------------------------------------
 // Produto do catálogo
@@ -37,6 +52,15 @@ export class Produto {
 
   @Column({ name: 'stock' })
   estoque: number;
+
+  @Index('IDX_products_status')
+  @Column({
+    type: 'enum',
+    enum: SituacaoDoProduto,
+    default: SituacaoDoProduto.ATIVO,
+    name: 'status',
+  })
+  situacao: SituacaoDoProduto;
 
   @Column({
     type: 'varchar',

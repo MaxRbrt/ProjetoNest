@@ -145,4 +145,33 @@ export class Pedido {
 
   @Column({ type: 'char', length: 2, name: 'shippingState' })
   enderecoUf: string;
+
+  // ---------------------------------------------
+  // Rastro do cancelamento
+  // As três colunas nascem e morrem juntas: um CHECK no banco
+  // (CHK_orders_cancellation_consistency) garante que canceladoEm só existe
+  // quando situacao = CANCELADO, e vice-versa — não dá para gravar um dos
+  // dois sem o outro. canceladoPorId é quem executou a ação (o próprio
+  // cliente dono, ou um admin), não o dono do pedido, que já está em
+  // usuarioId. ON DELETE SET NULL: apagar esse usuário não pode apagar o
+  // pedido nem o histórico de quem comprou, só perde a atribuição de quem
+  // cancelou — mesmo padrão já usado em enderecoId.
+  // ---------------------------------------------
+  @Column({ type: 'timestamptz', nullable: true, name: 'canceledAt' })
+  canceladoEm: Date | null;
+
+  @Column({ type: 'uuid', nullable: true, name: 'canceledByUserId' })
+  canceladoPorId: string | null;
+
+  @ManyToOne(() => Usuario, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'canceledByUserId' })
+  canceladoPor: Usuario | null;
+
+  @Column({
+    type: 'varchar',
+    length: 300,
+    nullable: true,
+    name: 'cancellationReason',
+  })
+  motivoDoCancelamento: string | null;
 }

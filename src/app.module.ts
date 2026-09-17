@@ -10,6 +10,7 @@ import { PedidosModule } from './modules/pedidos/pedidos.module';
 import { EnderecosModule } from './modules/enderecos/enderecos.module';
 import { FreteModule } from './modules/frete/frete.module';
 import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
+import { MetricasModule } from './modules/metricas/metricas.module';
 import { criarOpcoesDaFonteDeDados } from './db/opcoes-do-banco';
 import { validarAmbiente } from './config/validacao-de-ambiente';
 import { AutenticacaoModule } from './modules/auth/autenticacao.module';
@@ -58,6 +59,7 @@ import { GuardaDePapel } from './modules/auth/guards/papel.guard';
     EnderecosModule,
     FreteModule,
     PagamentosModule,
+    MetricasModule,
     AutenticacaoModule,
   ],
   controllers: [AppController],
